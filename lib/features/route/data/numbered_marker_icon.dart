@@ -45,4 +45,38 @@ abstract final class NumberedMarkerIcon {
       imagePixelRatio: _pixelRatio,
     );
   }
+
+  static Future<BitmapDescriptor> arrow() async {
+    const pixelRatio = 3.0;
+    const logicalSize = 44.0;
+    final size = (logicalSize * pixelRatio).round();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    final path = Path()
+      ..moveTo(size * 0.50, size * 0.08)
+      ..lineTo(size * 0.86, size * 0.82)
+      ..lineTo(size * 0.50, size * 0.64)
+      ..lineTo(size * 0.14, size * 0.82)
+      ..close();
+
+    canvas.drawPath(path, Paint()..color = AppColors.brand);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = AppColors.onBrand
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    final image = await recorder.endRecording().toImage(size, size);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+
+    return BitmapDescriptor.bytes(
+      bytes!.buffer.asUint8List(),
+      imagePixelRatio: pixelRatio,
+    );
+  }
 }

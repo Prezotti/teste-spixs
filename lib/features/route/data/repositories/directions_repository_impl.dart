@@ -3,6 +3,7 @@ import 'package:teste_spixs/features/home/domain/entities/place_details.dart';
 import 'package:teste_spixs/features/route/data/polyline_decoder.dart';
 import 'package:teste_spixs/features/route/data/services/routes_api_service.dart';
 import 'package:teste_spixs/features/route/domain/entities/geo_point.dart';
+import 'package:teste_spixs/features/route/domain/entities/route_maneuver.dart';
 import 'package:teste_spixs/features/route/domain/entities/optimized_route.dart';
 import 'package:teste_spixs/features/route/domain/entities/route_stop.dart';
 import 'package:teste_spixs/features/route/domain/repositories/directions_repository.dart';
@@ -18,13 +19,13 @@ class DirectionsRepositoryImpl implements DirectionsRepository {
     double? originLatitude,
     double? originLongitude,
   }) async {
-    if (stops.length < 2) {
+    final hasOrigin = originLatitude != null && originLongitude != null;
+    if (stops.isEmpty || (!hasOrigin && stops.length < 2)) {
       throw const DirectionsException(
         'Adicione pelo menos 2 endereços para traçar a rota.',
       );
     }
 
-    final hasOrigin = originLatitude != null && originLongitude != null;
     final origin = hasOrigin
         ? GeoPoint(originLatitude, originLongitude)
         : GeoPoint(stops.first.latitude, stops.first.longitude);
@@ -81,10 +82,20 @@ class DirectionsRepositoryImpl implements DirectionsRepository {
     var distanceMeters = 0;
     var durationSeconds = 0;
     final polyline = <GeoPoint>[];
+    final legDistances = <int>[];
+    final legDurations = <int>[];
+    final maneuvers = <RouteManeuver>[];
+    var legIndex = 0;
 
     for (final leg in travelLegs) {
-      distanceMeters += (leg['distanceMeters'] as num?)?.toInt() ?? 0;
-      durationSeconds += _parseDuration(leg['duration']);
+      final legDistance = (leg['distanceMeters'] as num?)?.toInt() ?? 0;
+      final legDuration = _parseDuration(leg['duration']);
+      legDistances.add(legDistance);
+      legDurations.add(legDuration);
+      distanceMeters += legDistance;
+      durationSeconds += legDuration;
+      if (legIndex == 0) maneuvers.addAll(_maneuversOf(leg));
+      legIndex++;
 
       final encoded = leg['polyline']?['encodedPolyline'] as String?;
       if (encoded == null || encoded.isEmpty) continue;
@@ -115,12 +126,39 @@ class DirectionsRepositoryImpl implements DirectionsRepository {
       origin: hasOrigin ? origin : null,
       stops: [
         for (var i = 0; i < orderedStops.length; i++)
-          RouteStop(number: i + 1, place: orderedStops[i]),
+          RouteStop(
+            number: i + 1,
+            place: orderedStops[i],
+            legDistanceMeters: i < legDistances.length ? legDistances[i] : 0,
+            legDurationSeconds: i < legDurations.length ? legDurations[i] : 0,
+          ),
       ],
       polyline: polyline,
       distanceMeters: distanceMeters,
       durationSeconds: durationSeconds,
+      maneuvers: maneuvers,
     );
+  }
+
+  List<RouteManeuver> _maneuversOf(Map<String, dynamic> leg) {
+    final steps = leg['steps'] as List<dynamic>? ?? const [];
+    final maneuvers = <RouteManeuver>[];
+    for (final step in steps.whereType<Map<String, dynamic>>()) {
+      final instruction = step['navigationInstruction'] as Map<String, dynamic>?;
+      final text = instruction?['instructions'] as String?;
+      final end = step['endLocation']?['latLng'] as Map<String, dynamic>?;
+      final latitude = (end?['latitude'] as num?)?.toDouble();
+      final longitude = (end?['longitude'] as num?)?.toDouble();
+      if (text == null || text.isEmpty || latitude == null || longitude == null) continue;
+      maneuvers.add(
+        RouteManeuver(
+          instruction: text,
+          maneuver: instruction?['maneuver'] as String? ?? '',
+          end: GeoPoint(latitude, longitude),
+        ),
+      );
+    }
+    return maneuvers;
   }
 
   int _parseDuration(Object? value) {

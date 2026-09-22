@@ -19,9 +19,23 @@ class RoutePage extends GetView<RouteController> {
           const _MapStatusOverlay(),
           Column(
             children: [
-              const _TopPanel(),
-              const Expanded(child: _MyLocationButton()),
-              const _BottomPanel(),
+              Obx(
+                () => controller.isNavigating.value
+                    ? const _NavBanner()
+                    : const _TopPanel(),
+              ),
+              Expanded(
+                child: Obx(
+                  () => controller.isNavigating.value
+                      ? const _NavControls()
+                      : const _MyLocationButton(),
+                ),
+              ),
+              Obx(
+                () => controller.isNavigating.value
+                    ? const _NavDestinationCard()
+                    : const _BottomPanel(),
+              ),
             ],
           ),
         ],
@@ -67,7 +81,7 @@ class _StableMapState extends State<_StableMap> {
       initialCameraPosition: controller.initialCamera,
       markers: controller.markers,
       polylines: controller.polylines,
-      myLocationEnabled: true,
+      myLocationEnabled: !controller.isNavigating.value,
       myLocationButtonEnabled: false,
       zoomControlsEnabled: false,
       compassEnabled: false,
@@ -106,6 +120,223 @@ class _MyLocationButton extends GetView<RouteController> {
         ),
       ),
     );
+  }
+}
+
+class _NavBanner extends GetView<RouteController> {
+  const _NavBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final recalculated = controller.showRecalcBanner.value;
+      controller.userPosition.value;
+      controller.route.value;
+      return Material(
+        color: recalculated ? AppColors.warning : AppColors.success,
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.space3,
+              AppSpacing.space2,
+              AppSpacing.space3,
+              AppSpacing.space3,
+            ),
+            child: recalculated ? const _RecalcBannerBody() : const _ManeuverBannerBody(),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _ManeuverBannerBody extends GetView<RouteController> {
+  const _ManeuverBannerBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final here = controller.userPosition.value;
+    final maneuver = controller.activeManeuver;
+    final instruction = maneuver?.instruction ?? _fallbackInstruction(controller);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          _iconForManeuver(maneuver?.maneuver),
+          color: AppColors.onBrand,
+          size: AppSpacing.space4,
+        ),
+        const SizedBox(width: AppSpacing.space3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              UIText.display(
+                _formatDistance(controller.distanceToActiveStep(here)),
+                color: AppColors.onBrand,
+              ),
+              UIText.body(instruction, color: AppColors.onBrand, maxLines: 2),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RecalcBannerBody extends StatelessWidget {
+  const _RecalcBannerBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.warning_amber_rounded, color: AppColors.onBrand, size: AppSpacing.space4),
+        SizedBox(width: AppSpacing.space3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              UIText.heading('Rota recalculada', color: AppColors.onBrand),
+              SizedBox(height: AppSpacing.space1),
+              UIText.body(
+                'Você se desviou da rota. Nova rota otimizada com os pontos restantes.',
+                color: AppColors.onBrand,
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NavControls extends GetView<RouteController> {
+  const _NavControls();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(right: AppSpacing.space3),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _RoundMapButton(
+              onTap: controller.voiceOn.toggle,
+              child: Obx(
+                () => Icon(
+                  controller.voiceOn.value ? Icons.volume_up : Icons.volume_off,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.space3),
+            _RoundMapButton(
+              onTap: controller.stopNavigation,
+              child: const Icon(Icons.close, color: AppColors.danger),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundMapButton extends StatelessWidget {
+  const _RoundMapButton({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface200,
+      shape: const CircleBorder(side: BorderSide(color: AppColors.border)),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: AppSpacing.space4 + AppSpacing.space3,
+          height: AppSpacing.space4 + AppSpacing.space3,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _NavDestinationCard extends GetView<RouteController> {
+  const _NavDestinationCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final current = controller.route.value;
+      if (current == null || current.stops.isEmpty) return const SizedBox.shrink();
+      final next = current.stops.first;
+      final index = controller.progressIndex.value;
+      final total = controller.progressTotal.value;
+      final fraction = total == 0 ? 0.0 : (index / total).clamp(0.0, 1.0);
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.space3),
+        child: Material(
+          color: AppColors.surface200,
+          borderRadius: AppRadius.lgAll,
+          child: Padding(
+            padding: AppSpacing.card,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const UIText.caption('Próximo destino'),
+                const SizedBox(height: AppSpacing.space1),
+                UIText.heading(
+                  next.place.address,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.space2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: UIText.body(
+                        '${_formatDuration(next.legDurationSeconds)} · ${_formatDistance(next.legDistanceMeters)}',
+                        color: AppColors.inkMuted,
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        UIText.bodyStrong('$index de $total'),
+                        const SizedBox(height: AppSpacing.space1),
+                        SizedBox(
+                          width: AppSpacing.space4 * 2,
+                          child: ClipRRect(
+                            borderRadius: AppRadius.smAll,
+                            child: LinearProgressIndicator(
+                              value: fraction,
+                              minHeight: AppSpacing.space1.toDouble(),
+                              color: AppColors.brand,
+                              backgroundColor: AppColors.border,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
   }
 }
 
@@ -300,7 +531,7 @@ class _OrderRow extends StatelessWidget {
   }
 }
 
-class _RouteSummary extends StatelessWidget {
+class _RouteSummary extends GetView<RouteController> {
   const _RouteSummary({required this.route});
 
   final OptimizedRoute route;
@@ -321,13 +552,32 @@ class _RouteSummary extends StatelessWidget {
                 '${_formatDuration(route.durationSeconds)} (${_formatDistance(route.distanceMeters)})',
               ),
               const SizedBox(height: AppSpacing.space1),
-              UIText.caption(
-                'Rota otimizada com $stops ${stops == 1 ? 'parada' : 'paradas'}',
-              ),
+              Obx(() {
+                final message = controller.notice.value;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    UIText.caption(
+                      'Rota otimizada com $stops ${stops == 1 ? 'parada' : 'paradas'}',
+                    ),
+                    if (message != null) ...[
+                      const SizedBox(height: AppSpacing.space2),
+                      Container(
+                        padding: AppSpacing.related,
+                        decoration: const BoxDecoration(
+                          color: AppColors.warning,
+                          borderRadius: AppRadius.smAll,
+                        ),
+                        child: UIText.bodyStrong(message),
+                      ),
+                    ],
+                  ],
+                );
+              }),
               const SizedBox(height: AppSpacing.space3),
               UIPrimaryButton(
                 label: 'Iniciar',
-                onPressed: () {},
+                onPressed: controller.startNavigation,
               ),
             ],
           ),
@@ -335,6 +585,22 @@ class _RouteSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+String _fallbackInstruction(RouteController controller) {
+  final stops = controller.route.value?.stops ?? const [];
+  if (stops.isEmpty) return 'Siga em frente';
+  return 'Siga para ${stops.first.place.address}';
+}
+
+IconData _iconForManeuver(String? maneuver) {
+  final value = (maneuver ?? '').toUpperCase();
+  if (value.contains('UTURN_LEFT')) return Icons.u_turn_left;
+  if (value.contains('UTURN')) return Icons.u_turn_right;
+  if (value.contains('LEFT')) return Icons.turn_left;
+  if (value.contains('RIGHT')) return Icons.turn_right;
+  if (value.contains('ROUNDABOUT')) return Icons.roundabout_right;
+  return Icons.straight;
 }
 
 String _formatDistance(int meters) {

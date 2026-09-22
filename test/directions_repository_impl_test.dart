@@ -56,6 +56,18 @@ void main() {
                 'polyline': {
                   'encodedPolyline': '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
                 },
+                if (i == 0)
+                  'steps': [
+                    {
+                      'navigationInstruction': {
+                        'maneuver': 'TURN_RIGHT',
+                        'instructions': 'Vire à direita na R. Augusta',
+                      },
+                      'endLocation': {
+                        'latLng': {'latitude': -23.551, 'longitude': -46.651},
+                      },
+                    },
+                  ],
               },
           ],
         },
@@ -84,6 +96,11 @@ void main() {
     expect(route.distanceMeters, 3000);
     expect(route.durationSeconds, 360);
     expect(route.polyline, isNotEmpty);
+    expect(route.stops.first.legDistanceMeters, 1000);
+    expect(route.stops.first.legDurationSeconds, 120);
+    expect(route.maneuvers, hasLength(1));
+    expect(route.maneuvers.first.instruction, 'Vire à direita na R. Augusta');
+    expect(route.maneuvers.first.maneuver, 'TURN_RIGHT');
   });
 
   test('keeps the first stop as start when there is no origin', () async {

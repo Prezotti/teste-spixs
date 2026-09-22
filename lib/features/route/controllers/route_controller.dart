@@ -1,13 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/painting.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:teste_spixs/core/design/design.dart';
 import 'package:teste_spixs/core/errors/app_exception.dart';
 import 'package:teste_spixs/core/location/location_permission_service.dart';
+import 'package:teste_spixs/features/home/domain/entities/place_details.dart';
 import 'package:teste_spixs/features/route/data/numbered_marker_icon.dart';
+import 'package:teste_spixs/features/route/domain/entities/geo_point.dart';
 import 'package:teste_spixs/features/route/domain/entities/optimized_route.dart';
+import 'package:teste_spixs/features/route/domain/entities/route_maneuver.dart';
 import 'package:teste_spixs/features/route/domain/repositories/directions_repository.dart';
 import 'package:teste_spixs/features/route/domain/route_plan_args.dart';
+import 'package:teste_spixs/features/route/domain/route_progress.dart';
 
 class RouteController extends GetxController {
   RouteController({
@@ -21,13 +28,35 @@ class RouteController extends GetxController {
   final LocationPermissionService _locationPermissionService;
   final RoutePlanArgs args;
 
+  static const _offRouteSamplesNeeded = 2;
+  static const _recalcCooldown = Duration(seconds: 20);
+  static const _stepArrivalMeters = 35.0;
+
   final isLoading = false.obs;
   final errorText = Rxn<String>();
   final route = Rxn<OptimizedRoute>();
   final isOrderExpanded = true.obs;
   final markersTick = 0.obs;
+  final isNavigating = false.obs;
+  final isRecalculating = false.obs;
+  final notice = RxnString();
+  final userPosition = Rxn<GeoPoint>();
+  final userHeading = 0.0.obs;
+  final showRecalcBanner = false.obs;
+  final voiceOn = true.obs;
+  final progressIndex = 1.obs;
+  final progressTotal = 0.obs;
 
   final Map<int, BitmapDescriptor> _markerIcons = {};
+  final Set<String> _visitedPlaceIds = {};
+
+  StreamSubscription<Position>? _positionSub;
+  Timer? _noticeTimer;
+  Timer? _recalcBannerTimer;
+  BitmapDescriptor? _arrowIcon;
+  var _offRouteSamples = 0;
+  var _maneuverIndex = 0;
+  DateTime? _lastRecalcAt;
 
   void toggleOrder() => isOrderExpanded.toggle();
 
@@ -44,7 +73,7 @@ class RouteController extends GetxController {
     final current = route.value;
     if (current == null) return const {};
 
-    return {
+    final markers = <Marker>{
       for (final stop in current.stops)
         if (_markerIcons[stop.number] != null)
           Marker(
@@ -56,18 +85,60 @@ class RouteController extends GetxController {
             zIndexInt: stop.number,
           ),
     };
+
+    final here = userPosition.value;
+    final arrow = _arrowIcon;
+    if (isNavigating.value && here != null && arrow != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('user'),
+          position: LatLng(here.latitude, here.longitude),
+          icon: arrow,
+          rotation: userHeading.value,
+          flat: true,
+          anchor: const Offset(0.5, 0.5),
+          zIndexInt: 1000,
+        ),
+      );
+    }
+    return markers;
+  }
+
+  RouteManeuver? get activeManeuver {
+    final maneuvers = route.value?.maneuvers ?? const [];
+    if (maneuvers.isEmpty) return null;
+    final index = _maneuverIndex.clamp(0, maneuvers.length - 1);
+    return maneuvers[index];
+  }
+
+  int distanceToActiveStep(GeoPoint? here) {
+    final maneuver = activeManeuver;
+    if (maneuver != null && here != null) {
+      return RouteProgressEvaluator.distanceMeters(here, maneuver.end).round();
+    }
+    final stops = route.value?.stops ?? const [];
+    if (stops.isEmpty) return 0;
+    if (here == null) return stops.first.legDistanceMeters;
+    return RouteProgressEvaluator.distanceMeters(
+      here,
+      GeoPoint(stops.first.place.latitude, stops.first.place.longitude),
+    ).round();
   }
 
   Set<Polyline> get polylines {
     final current = route.value;
     if (current == null) return const {};
 
+    final recalculated = showRecalcBanner.value;
     return {
       Polyline(
         polylineId: const PolylineId('optimized-route'),
         points: [for (final point in current.polyline) LatLng(point.latitude, point.longitude)],
-        color: AppColors.brand,
+        color: recalculated ? AppColors.warning : AppColors.brand,
         width: AppSpacing.space1.toInt(),
+        patterns: recalculated
+            ? [PatternItem.dash(20), PatternItem.gap(12)]
+            : const <PatternItem>[],
       ),
     };
   }
@@ -80,8 +151,195 @@ class RouteController extends GetxController {
 
   @override
   void onClose() {
+    _stopPositionStream();
+    _noticeTimer?.cancel();
+    _recalcBannerTimer?.cancel();
     _mapController = null;
     super.onClose();
+  }
+
+  Future<void> startNavigation() async {
+    if (isNavigating.value || route.value == null) return;
+
+    final granted = await _locationPermissionService.isGranted() || await _locationPermissionService.request();
+    if (!granted) {
+      _showNotice('Ative a localização para navegar.');
+      return;
+    }
+
+    progressTotal.value = route.value!.stops.length;
+    progressIndex.value = 1;
+    _maneuverIndex = 0;
+    _offRouteSamples = 0;
+    showRecalcBanner.value = false;
+    try {
+      _arrowIcon ??= await NumberedMarkerIcon.arrow();
+    } catch (_) {
+      _arrowIcon = null;
+    }
+    isNavigating.value = true;
+    markersTick.value++;
+    _positionSub = _locationPermissionService.watch().listen(
+      _onPosition,
+      onError: (_) => _showNotice('Não foi possível ler o GPS. Tente novamente.'),
+    );
+  }
+
+  void stopNavigation() {
+    final here = userPosition.value;
+    _stopPositionStream();
+    isNavigating.value = false;
+    isRecalculating.value = false;
+    showRecalcBanner.value = false;
+    userPosition.value = null;
+    markersTick.value++;
+    _faceNorth(here);
+  }
+
+  void _onPosition(Position position) {
+    final current = route.value;
+    if (!isNavigating.value || current == null) return;
+
+    final here = GeoPoint(position.latitude, position.longitude);
+    userPosition.value = here;
+    if (position.heading >= 0 && position.heading <= 360) {
+      userHeading.value = position.heading;
+    }
+    _advanceManeuver(current, here);
+    markersTick.value++;
+    _follow(here);
+
+    final progress = RouteProgressEvaluator.evaluate(
+      position: here,
+      polyline: current.polyline,
+      stops: current.stops,
+      alreadyVisited: _visitedPlaceIds,
+    );
+    final arrived = progress.visitedPlaceIds.difference(_visitedPlaceIds);
+    _visitedPlaceIds.addAll(progress.visitedPlaceIds);
+
+    final remaining = [
+      for (final stop in current.stops)
+        if (!_visitedPlaceIds.contains(stop.place.placeId)) stop.place,
+    ];
+
+    if (remaining.isEmpty) {
+      stopNavigation();
+      _showNotice('Você concluiu as paradas.');
+      return;
+    }
+
+    if (arrived.isNotEmpty) {
+      final next = progressIndex.value + arrived.length;
+      progressIndex.value = next > progressTotal.value ? progressTotal.value : next;
+      _recalculate(here, remaining, announce: false);
+      return;
+    }
+
+    if (!progress.offRoute) {
+      _offRouteSamples = 0;
+      return;
+    }
+
+    _offRouteSamples++;
+    if (_offRouteSamples < _offRouteSamplesNeeded || isRecalculating.value) return;
+    final lastRecalc = _lastRecalcAt;
+    if (lastRecalc != null && DateTime.now().difference(lastRecalc) < _recalcCooldown) {
+      return;
+    }
+    _recalculate(here, remaining, announce: true);
+  }
+
+  Future<void> _recalculate(GeoPoint here, List<PlaceDetails> remaining, {required bool announce}) async {
+    if (isRecalculating.value || remaining.isEmpty) return;
+    isRecalculating.value = true;
+    _lastRecalcAt = DateTime.now();
+    _offRouteSamples = 0;
+
+    try {
+      final optimized = await _directionsRepository.optimize(
+        stops: remaining,
+        originLatitude: here.latitude,
+        originLongitude: here.longitude,
+      );
+      await _loadMarkerIcons(optimized);
+      _maneuverIndex = 0;
+      route.value = optimized;
+      markersTick.value++;
+      if (announce) _showRecalcBanner();
+    } on AppException catch (error) {
+      _showNotice(error.message);
+    } catch (_) {
+      _showNotice('Não foi possível recalcular a rota.');
+    } finally {
+      isRecalculating.value = false;
+    }
+  }
+
+  void _showRecalcBanner() {
+    showRecalcBanner.value = true;
+    markersTick.value++;
+    _recalcBannerTimer?.cancel();
+    _recalcBannerTimer = Timer(const Duration(seconds: 5), () {
+      showRecalcBanner.value = false;
+      markersTick.value++;
+    });
+  }
+
+  void _advanceManeuver(OptimizedRoute current, GeoPoint here) {
+    final maneuvers = current.maneuvers;
+    while (_maneuverIndex < maneuvers.length - 1) {
+      final distance = RouteProgressEvaluator.distanceMeters(here, maneuvers[_maneuverIndex].end);
+      if (distance > _stepArrivalMeters) break;
+      _maneuverIndex++;
+    }
+  }
+
+  void _showNotice(String message) {
+    notice.value = message;
+    _noticeTimer?.cancel();
+    _noticeTimer = Timer(const Duration(seconds: 5), () {
+      if (notice.value == message) notice.value = null;
+    });
+  }
+
+  void _stopPositionStream() {
+    _positionSub?.cancel();
+    _positionSub = null;
+  }
+
+  Future<void> _follow(GeoPoint here) async {
+    final map = _mapController;
+    if (map == null) return;
+    final target = LatLng(here.latitude, here.longitude);
+    try {
+      await map.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: target,
+            zoom: 17,
+            bearing: userHeading.value,
+          ),
+        ),
+      );
+    } catch (_) {
+      // O mapa nativo pode ter sido recarregado no emulador.
+    }
+  }
+
+  Future<void> _faceNorth(GeoPoint? here) async {
+    final map = _mapController;
+    if (map == null || here == null) return;
+    try {
+      await map.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(here.latitude, here.longitude),
+            zoom: 15,
+          ),
+        ),
+      );
+    } catch (_) {}
   }
 
   Future<void> loadRoute() async {

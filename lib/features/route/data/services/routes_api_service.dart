@@ -25,7 +25,7 @@ class RoutesApiService {
         headers: {
           'X-Goog-Api-Key': _apiKey,
           'X-Goog-FieldMask':
-              'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.optimizedIntermediateWaypointIndex,routes.legs.duration,routes.legs.distanceMeters,routes.legs.polyline.encodedPolyline',
+              'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.optimizedIntermediateWaypointIndex,routes.legs.duration,routes.legs.distanceMeters,routes.legs.polyline.encodedPolyline,routes.legs.steps.navigationInstruction,routes.legs.steps.endLocation',
         },
         body: {
           'origin': _waypoint(origin),

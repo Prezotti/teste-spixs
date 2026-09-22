@@ -25,6 +25,15 @@ class LocationPermissionService {
     return _isGranted(permission);
   }
 
+  Stream<Position> watch() {
+    return Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 20,
+      ),
+    );
+  }
+
   Future<Position?> currentOrLast() async {
     if (!await isGranted()) return null;
 
