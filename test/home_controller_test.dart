@@ -5,6 +5,20 @@ import 'package:teste_spixs/features/home/controllers/home_controller.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_details.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_prediction.dart';
 import 'package:teste_spixs/features/home/domain/repositories/places_repository.dart';
+import 'package:teste_spixs/features/home/domain/repositories/recent_addresses_repository.dart';
+
+class _FakeRecents implements RecentAddressesRepository {
+  final saved = <PlaceDetails>[];
+
+  @override
+  Future<List<PlaceDetails>> read() async => List.of(saved);
+
+  @override
+  Future<void> remember(PlaceDetails place) async {
+    saved.removeWhere((item) => item.placeId == place.placeId);
+    saved.insert(0, place);
+  }
+}
 
 class _FakePlacesRepository implements PlacesRepository {
   _FakePlacesRepository(this.details);
@@ -42,6 +56,7 @@ void main() {
   test('starts with 3 points and can add more', () {
     final controller = HomeController(
       placesRepository: _FakePlacesRepository(details),
+      recentAddressesRepository: _FakeRecents(),
       locationPermissionService: LocationPermissionService(),
       searchDebouncer: Debouncer(delay: Duration.zero),
     )..onInit();
@@ -56,6 +71,7 @@ void main() {
   test('can remove extra points and relabels the rest', () {
     final controller = HomeController(
       placesRepository: _FakePlacesRepository(details),
+      recentAddressesRepository: _FakeRecents(),
       locationPermissionService: LocationPermissionService(),
       searchDebouncer: Debouncer(delay: Duration.zero),
     )..onInit();
@@ -81,8 +97,10 @@ void main() {
 
   test('selecting 3 places enables confirm', () async {
     final repository = _FakePlacesRepository(details);
+    final recents = _FakeRecents();
     final controller = HomeController(
       placesRepository: repository,
+      recentAddressesRepository: recents,
       locationPermissionService: LocationPermissionService(),
       searchDebouncer: Debouncer(delay: Duration.zero),
     )..onInit();
@@ -109,6 +127,7 @@ void main() {
   test('asks to pick a suggestion when the text was not selected', () {
     final controller = HomeController(
       placesRepository: _FakePlacesRepository(details),
+      recentAddressesRepository: _FakeRecents(),
       locationPermissionService: LocationPermissionService(),
       searchDebouncer: Debouncer(delay: Duration.zero),
     )..onInit();
@@ -117,6 +136,31 @@ void main() {
     expect(controller.createRoutePlan(), isNull);
     expect(controller.points[0].error, 'Selecione um endereço da lista');
     expect(controller.points[1].error, 'Campo obrigatório');
+    controller.onClose();
+  });
+
+  test('keeps a chosen address as a recent and fills a field from it', () async {
+    final recents = _FakeRecents();
+    final controller = HomeController(
+      placesRepository: _FakePlacesRepository(details),
+      recentAddressesRepository: recents,
+      locationPermissionService: LocationPermissionService(),
+      searchDebouncer: Debouncer(delay: Duration.zero),
+    )..onInit();
+
+    controller.prepareSearch(0);
+    expect(controller.showRecents.value, isTrue);
+
+    await controller.selectPrediction(0, const PlacePrediction(placeId: 'abc', description: 'Av. Paulista, 1000'));
+    expect(recents.saved.single.placeId, 'abc');
+
+    controller.onQueryChanged(1, 'ru');
+    expect(controller.showRecents.value, isFalse);
+    controller.onClear(1);
+    expect(controller.showRecents.value, isTrue);
+
+    controller.selectRecent(1, details);
+    expect(controller.points[1].selected?.address, details.address);
     controller.onClose();
   });
 }

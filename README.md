@@ -6,7 +6,7 @@ App Flutter de roteirização de entregas. O usuário destrava o aparelho, infor
 
 1. **Bloqueio.** Face ID ou digital. Se não houver biometria, ou se a tentativa falhar ou for cancelada, dá para entrar com a senha ou o PIN do celular.
 2. **Localização.** O app pede permissão antes da home. "Agora não" segue sem GPS; a busca de endereço continua, só que sem viés de proximidade.
-3. **Endereços.** Três campos obrigatórios e "Adicionar ponto" sem limite fixo. Tocar num campo abre a busca em tela cheia. Cada ponto extra pode ser removido. Só vale um endereço escolhido na lista, não texto livre.
+3. **Endereços.** Três campos obrigatórios e "Adicionar ponto" sem limite fixo. Tocar num campo abre a busca em tela cheia, com os endereços recentes até começar a digitar. Cada ponto extra pode ser removido. Só vale um endereço escolhido na lista, não texto livre.
 4. **Rota otimizada.** O ponto 1 é sempre a localização atual. A Routes API reordena os endereços digitados a partir do ponto 2.
 5. **Navegação.** "Iniciar" abre o modo de curva a curva: banner da manobra, próximo destino, progresso "1 de N" e seta acompanhando o GPS.
 6. **Recálculo.** Desvio confirmado gera uma rota nova só com as paradas que faltam. O banner laranja avisa o que aconteceu.
@@ -101,7 +101,7 @@ A tela não cria serviço. O binding registra a interface e a implementação. O
 | --- | --- | --- |
 | `/auth` | `AuthBindings` | `LocalAuthentication`, `AuthController` |
 | `/location-permission` | `LocationBindings` | `LocationPermissionController` |
-| `/home` | `HomeBindings` | Places service, `PlacesRepository`, `HomeController` |
+| `/home` | `HomeBindings` | Places service, `PlacesRepository`, recentes no Hive, `HomeController` |
 | `/route` | `RouteBindings` | Routes service, `DirectionsRepository`, `RouteController` |
 
 O HTTP só lança `NetworkException`. Cada service traduz isso para `PlacesException` ou `DirectionsException`. A tela mostra `error.message`. Timeout de 10 segundos. Falha de rede, resposta inválida e erro JSON da Google caem na mesma mensagem de "sem internet ou serviço indisponível", em vez do texto cru da API.
@@ -119,6 +119,8 @@ O modo de navegação não estava no spec escrito. Ele usa os mesmos tokens: ban
 Autocomplete em `places.googleapis.com/v1/places:autocomplete`, não na API legada. Field mask curto, `languageCode` `pt-BR`, sessão por campo. A sessão fecha no Place Details, que é o modelo de cobrança da Google: várias sugestões e um detalhe contam como uma sessão.
 
 A busca só dispara com 3 caracteres ou mais, com debounce de 400 ms. Uma resposta antiga é descartada se o usuário já digitou de novo. O viés é um círculo de 50 km em volta da posição atual, com `origin` para a API devolver `distanceMeters`. A lista é ordenada por essa distância.
+
+O endereço escolhido fica numa lista de até 10 recentes, gravada com Hive. Na busca essa lista aparece enquanto não há uma consulta nova. Ao digitar, ela sai e entram as sugestões da API. Escolher um recente não chama a Places de novo.
 
 ### Routes API e a ordem otimizada
 

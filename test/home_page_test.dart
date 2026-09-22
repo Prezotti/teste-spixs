@@ -7,7 +7,16 @@ import 'package:teste_spixs/features/home/controllers/home_controller.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_details.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_prediction.dart';
 import 'package:teste_spixs/features/home/domain/repositories/places_repository.dart';
+import 'package:teste_spixs/features/home/domain/repositories/recent_addresses_repository.dart';
 import 'package:teste_spixs/features/home/pages/home_page.dart';
+
+class _EmptyRecents implements RecentAddressesRepository {
+  @override
+  Future<List<PlaceDetails>> read() async => const [];
+
+  @override
+  Future<void> remember(PlaceDetails place) async {}
+}
 
 class _EmptyPlaces implements PlacesRepository {
   @override
@@ -38,6 +47,7 @@ void main() {
     Get.put(
       HomeController(
         placesRepository: _EmptyPlaces(),
+        recentAddressesRepository: _EmptyRecents(),
         locationPermissionService: LocationPermissionService(),
         searchDebouncer: Debouncer(delay: Duration.zero),
       ),

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:teste_spixs/core/design/design.dart';
 import 'package:teste_spixs/features/home/controllers/home_controller.dart';
 import 'package:teste_spixs/features/home/widgets/place_suggestions_list.dart';
+import 'package:teste_spixs/features/home/widgets/recent_addresses_list.dart';
 
 class AddressSearchPage extends GetView<HomeController> {
   const AddressSearchPage({super.key, required this.index});
@@ -50,6 +51,18 @@ class AddressSearchPage extends GetView<HomeController> {
               Expanded(
                 child: Obx(() {
                   final panel = controller.searchPanel.value;
+                  if (controller.showRecents.value) {
+                    final recents = controller.recentAddresses.toList();
+                    if (recents.isEmpty) return const SizedBox.shrink();
+                    return RecentAddressesList(
+                      addresses: recents,
+                      onSelected: (place) {
+                        controller.selectRecent(index, place);
+                        if (controller.points[index].hasSelection) Get.back();
+                      },
+                    );
+                  }
+
                   if (panel.index != index) return const SizedBox.shrink();
 
                   return PlaceSuggestionsList(

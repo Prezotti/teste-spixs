@@ -7,13 +7,16 @@ import 'package:teste_spixs/core/location/location_permission_service.dart';
 import 'package:teste_spixs/core/routes/app_routes.dart';
 import 'package:teste_spixs/core/utils/debouncer.dart';
 import 'package:teste_spixs/features/home/controllers/address_field.dart';
+import 'package:teste_spixs/features/home/domain/entities/place_details.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_prediction.dart';
 import 'package:teste_spixs/features/home/domain/repositories/places_repository.dart';
+import 'package:teste_spixs/features/home/domain/repositories/recent_addresses_repository.dart';
 import 'package:teste_spixs/features/route/domain/route_plan_args.dart';
 
 class HomeController extends GetxController {
   HomeController({
     required this._placesRepository,
+    required this._recentAddressesRepository,
     required this._locationPermissionService,
     Debouncer? searchDebouncer,
   }) : _debouncer = searchDebouncer ?? Debouncer();
@@ -21,10 +24,13 @@ class HomeController extends GetxController {
   static const minStops = 3;
 
   final PlacesRepository _placesRepository;
+  final RecentAddressesRepository _recentAddressesRepository;
   final LocationPermissionService _locationPermissionService;
   final Debouncer _debouncer;
 
   final points = <AddressField>[].obs;
+  final recentAddresses = <PlaceDetails>[].obs;
+  final showRecents = true.obs;
   final searchPanel = const AddressSearchPanel.idle().obs;
   final canConfirm = false.obs;
   final isConfirming = false.obs;
@@ -43,6 +49,7 @@ class HomeController extends GetxController {
     for (var i = 0; i < minStops; i++) {
       points.add(AddressField(label: _labelFor(i)));
     }
+    _loadRecents();
   }
 
   @override
@@ -96,8 +103,16 @@ class HomeController extends GetxController {
     points.refresh();
   }
 
+  void prepareSearch(int index) {
+    showRecents.value = true;
+    if (searchPanel.value.index != index) {
+      searchPanel.value = const AddressSearchPanel.idle();
+    }
+  }
+
   void onQueryChanged(int index, String query) {
     if (_applyingSelection) return;
+    showRecents.value = query.trim().isEmpty;
     final field = points[index];
     field.selected = null;
     field.error = null;
@@ -122,6 +137,7 @@ class HomeController extends GetxController {
   }
 
   void onClear(int index) {
+    showRecents.value = true;
     final field = points[index];
     field.selected = null;
     field.error = null;
@@ -145,20 +161,47 @@ class HomeController extends GetxController {
         sessionToken: _sessionToken!,
       );
 
-      _applyingSelection = true;
-      final field = points[index];
-      field.selected = details;
-      field.error = null;
-      field.textController.text = details.address;
-      _applyingSelection = false;
+      _applySelection(index, details);
       _endSession();
-      _syncCanConfirm();
-      points.refresh();
       searchPanel.value = const AddressSearchPanel.idle();
+      await _remember(details);
     } on AppException catch (error) {
       _applyingSelection = false;
       searchPanel.value = AddressSearchPanel.error(index, error.message);
     }
+  }
+
+  void selectRecent(int index, PlaceDetails place) {
+    _debouncer.cancel();
+    _dismissKeyboard();
+    _applySelection(index, place);
+    searchPanel.value = const AddressSearchPanel.idle();
+    showRecents.value = true;
+    _remember(place);
+  }
+
+  void _applySelection(int index, PlaceDetails place) {
+    _applyingSelection = true;
+    final field = points[index];
+    field.selected = place;
+    field.error = null;
+    field.textController.text = place.address;
+    _applyingSelection = false;
+    _syncCanConfirm();
+    points.refresh();
+  }
+
+  Future<void> _remember(PlaceDetails place) async {
+    try {
+      await _recentAddressesRepository.remember(place);
+      recentAddresses.assignAll(await _recentAddressesRepository.read());
+    } catch (_) {
+      // Falha ao gravar o recente não impede de usar o endereço.
+    }
+  }
+
+  Future<void> _loadRecents() async {
+    recentAddresses.assignAll(await _recentAddressesRepository.read());
   }
 
   void _dismissKeyboard() {

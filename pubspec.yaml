@@ -43,6 +43,7 @@ dependencies:
   google_maps_flutter: ^2.18.1
   google_maps_flutter_android: ^2.19.10
   google_maps_flutter_platform_interface: ^2.17.0
+  hive_flutter: ^1.1.0
 
 dev_dependencies:
   flutter_test:

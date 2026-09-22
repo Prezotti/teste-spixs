@@ -112,7 +112,10 @@ class _AddressFieldRow extends GetView<HomeController> {
                 hintText: field.label,
                 errorText: field.error,
                 readOnly: true,
-                onTap: () => Get.to(() => AddressSearchPage(index: index)),
+                onTap: () {
+                  controller.prepareSearch(index);
+                  Get.to(() => AddressSearchPage(index: index));
+                },
                 onClear: () => controller.onClear(index),
               ),
             ),
