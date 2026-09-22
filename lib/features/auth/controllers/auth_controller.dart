@@ -2,14 +2,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:teste_spixs/core/location/location_permission_service.dart';
 import 'package:teste_spixs/core/routes/app_routes.dart';
 import 'package:teste_spixs/features/auth/widgets/auth_retry_dialog.dart';
 
 class AuthController extends GetxController {
-  AuthController({LocalAuthentication? localAuth})
-    : _localAuth = localAuth ?? LocalAuthentication();
+  AuthController({
+    required LocalAuthentication localAuth,
+    required LocationPermissionService locationPermissionService,
+  }) : _localAuth = localAuth,
+       _locationPermissionService = locationPermissionService;
 
   final LocalAuthentication _localAuth;
+  final LocationPermissionService _locationPermissionService;
 
   final isLoading = false.obs;
 
@@ -107,7 +112,10 @@ class AuthController extends GetxController {
     };
   }
 
-  void _goHome() {
-    Get.offAllNamed(AppRoutes.home);
+  Future<void> _goHome() async {
+    final granted = await _locationPermissionService.isGranted();
+    Get.offAllNamed(
+      granted ? AppRoutes.home : AppRoutes.locationPermission,
+    );
   }
 }

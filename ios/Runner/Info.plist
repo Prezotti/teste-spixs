@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use sua biometria para desbloquear o Rota.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Usaremos sua localização para mostrar o ponto de partida, calcular rotas e navegar em tempo real.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

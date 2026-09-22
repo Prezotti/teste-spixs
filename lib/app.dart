@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:teste_spixs/core/design/design.dart';
+import 'package:teste_spixs/core/di/core_bindings.dart';
 import 'package:teste_spixs/core/routes/app_pages.dart';
 import 'package:teste_spixs/core/routes/app_routes.dart';
 
@@ -24,6 +25,7 @@ class RotaApp extends StatelessWidget {
           outline: AppColors.border,
         ),
       ),
+      initialBinding: CoreBindings(),
       initialRoute: AppRoutes.auth,
       getPages: AppPages.routes,
     );
