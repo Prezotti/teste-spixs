@@ -4,7 +4,7 @@ App Flutter de roteirização de entregas. O usuário destrava o aparelho, infor
 
 ## Fluxo
 
-1. **Bloqueio.** Face ID ou digital. Se não houver biometria, ou se a tentativa falhar ou for cancelada, dá para entrar com a senha ou o PIN do celular.
+1. **Bloqueio.** Face ID ou digital. Se não houver biometria, ou se a tentativa falhar ou for cancelada, dá para entrar com a senha ou o PIN do celular. Sem biometria e sem PIN, a tela de bloqueio não aparece.
 2. **Localização.** O app pede permissão antes da home. "Agora não" segue sem GPS; a busca de endereço continua, só que sem viés de proximidade.
 3. **Endereços.** Três campos obrigatórios e "Adicionar ponto" sem limite fixo. Tocar num campo abre a busca em tela cheia, com os endereços recentes até começar a digitar. Cada ponto extra pode ser removido. Só vale um endereço escolhido na lista, não texto livre.
 4. **Rota otimizada.** O ponto 1 é sempre a localização atual. A Routes API reordena os endereços digitados a partir do ponto 2.

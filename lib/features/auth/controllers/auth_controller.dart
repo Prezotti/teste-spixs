@@ -31,8 +31,10 @@ class AuthController extends GetxController {
     var failed = false;
 
     try {
-      final supported = await _localAuth.isDeviceSupported();
-      if (!supported) return;
+      if (!await _localAuth.isDeviceSupported()) {
+        _goHome();
+        return;
+      }
 
       final biometrics = await _localAuth.getAvailableBiometrics();
       if (biometrics.isEmpty) return;
@@ -49,6 +51,13 @@ class AuthController extends GetxController {
         return;
       }
 
+      failed = true;
+    } on LocalAuthException catch (exception) {
+      if (exception.code == LocalAuthExceptionCode.noCredentialsSet) {
+        _goHome();
+        return;
+      }
+      if (exception.code == LocalAuthExceptionCode.noBiometricsEnrolled) return;
       failed = true;
     } on PlatformException catch (exception) {
       if (_isBiometricUnavailable(exception)) return;
@@ -81,8 +90,10 @@ class AuthController extends GetxController {
     isLoading.value = true;
 
     try {
-      final supported = await _localAuth.isDeviceSupported();
-      if (!supported) return;
+      if (!await _localAuth.isDeviceSupported()) {
+        _goHome();
+        return;
+      }
 
       final ok = await _localAuth.authenticate(
         localizedReason: 'Use a senha do celular para continuar',
@@ -91,8 +102,10 @@ class AuthController extends GetxController {
       );
 
       if (ok) _goHome();
-    } on PlatformException {
-      // Sem senha configurada ou falha nativa: permanece na tela.
+    } on LocalAuthException catch (exception) {
+      if (exception.code == LocalAuthExceptionCode.noCredentialsSet) _goHome();
+    } on PlatformException catch (exception) {
+      if (exception.code == 'PasscodeNotSet' || exception.code == 'NotAvailable') _goHome();
     } finally {
       isLoading.value = false;
     }
