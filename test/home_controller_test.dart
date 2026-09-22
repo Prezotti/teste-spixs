@@ -99,6 +99,10 @@ void main() {
 
     expect(controller.canConfirm.value, isTrue);
     expect(repository.lastPlaceId, 'abc');
+
+    final plan = controller.createRoutePlan();
+    expect(plan, isNotNull);
+    expect(plan!.stops, hasLength(3));
     controller.onClose();
   });
 }

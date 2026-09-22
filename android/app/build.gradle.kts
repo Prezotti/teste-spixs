@@ -1,9 +1,35 @@
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+fun loadDotEnv(file: File): Map<String, String> {
+    if (!file.exists()) return emptyMap()
+    return file.readLines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+        .associate { line ->
+            val idx = line.indexOf('=')
+            val key = line.substring(0, idx).trim()
+            var value = line.substring(idx + 1).trim()
+            if (value.length >= 2 &&
+                (
+                    (value.startsWith("\"") && value.endsWith("\"")) ||
+                        (value.startsWith("'") && value.endsWith("'"))
+                )
+            ) {
+                value = value.substring(1, value.length - 1)
+            }
+            key to value
+        }
+}
+
+val googleMapsApiKey =
+    loadDotEnv(rootProject.file("../.env"))["GOOGLE_MAPS_API_KEY"] ?: ""
 
 android {
     namespace = "com.spixs.teste_spixs"
@@ -28,6 +54,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {

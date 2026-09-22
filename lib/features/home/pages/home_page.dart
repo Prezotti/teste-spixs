@@ -29,6 +29,8 @@ class HomePage extends GetView<HomeController> {
                 child: Obx(() {
                   final fields = controller.points.toList();
                   return ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     children: [
                       for (var index = 0; index < fields.length; index++) ...[
                         _AddressFieldRow(

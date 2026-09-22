@@ -45,7 +45,10 @@ class PlaceSuggestionsList extends StatelessWidget {
           if (!isLoading)
             ...suggestions.map(
               (prediction) => InkWell(
-                onTap: () => onSelected(prediction),
+                onTap: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  onSelected(prediction);
+                },
                 child: Padding(
                   padding: AppSpacing.card,
                   child: Column(

@@ -6,6 +6,8 @@ import 'package:teste_spixs/features/home/bindings/home_bindings.dart';
 import 'package:teste_spixs/features/home/pages/home_page.dart';
 import 'package:teste_spixs/features/location/bindings/location_bindings.dart';
 import 'package:teste_spixs/features/location/pages/location_permission_page.dart';
+import 'package:teste_spixs/features/route/bindings/route_bindings.dart';
+import 'package:teste_spixs/features/route/pages/route_page.dart';
 
 abstract final class AppPages {
   static final routes = [
@@ -23,6 +25,11 @@ abstract final class AppPages {
       name: AppRoutes.home,
       page: () => const HomePage(),
       binding: HomeBindings(),
+    ),
+    GetPage(
+      name: AppRoutes.route,
+      page: () => const RoutePage(),
+      binding: RouteBindings(),
     ),
   ];
 }

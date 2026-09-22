@@ -15,3 +15,7 @@ class NetworkException extends AppException {
 class PlacesException extends AppException {
   const PlacesException(super.message, {super.cause});
 }
+
+class DirectionsException extends AppException {
+  const DirectionsException(super.message, {super.cause});
+}

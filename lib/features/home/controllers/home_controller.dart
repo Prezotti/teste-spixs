@@ -1,11 +1,15 @@
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:teste_spixs/core/config/app_config.dart';
 import 'package:teste_spixs/core/errors/app_exception.dart';
 import 'package:teste_spixs/core/location/location_permission_service.dart';
+import 'package:teste_spixs/core/routes/app_routes.dart';
 import 'package:teste_spixs/core/utils/debouncer.dart';
 import 'package:teste_spixs/features/home/controllers/address_field.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_prediction.dart';
 import 'package:teste_spixs/features/home/domain/repositories/places_repository.dart';
+import 'package:teste_spixs/features/route/domain/route_plan_args.dart';
 
 class HomeController extends GetxController {
   HomeController({
@@ -31,6 +35,7 @@ class HomeController extends GetxController {
   int? _sessionFieldIndex;
   double? _biasLatitude;
   double? _biasLongitude;
+  var _applyingSelection = false;
 
   @override
   void onInit() {
@@ -92,6 +97,7 @@ class HomeController extends GetxController {
   }
 
   void onQueryChanged(int index, String query) {
+    if (_applyingSelection) return;
     final field = points[index];
     field.selected = null;
     field.error = null;
@@ -129,27 +135,62 @@ class HomeController extends GetxController {
 
   Future<void> selectPrediction(int index, PlacePrediction prediction) async {
     _debouncer.cancel();
-    searchPanel.value = AddressSearchPanel.loading(index);
+    _dismissKeyboard();
+    searchPanel.value = const AddressSearchPanel.idle();
 
     try {
       _ensureSession(index);
-      final details = await _placesRepository.getDetails(prediction.placeId, sessionToken: _sessionToken!);
+      final details = await _placesRepository.getDetails(
+        prediction.placeId,
+        sessionToken: _sessionToken!,
+      );
 
+      _applyingSelection = true;
       final field = points[index];
       field.selected = details;
       field.error = null;
       field.textController.text = details.address;
-      field.focusNode.unfocus();
+      _applyingSelection = false;
       _endSession();
       _syncCanConfirm();
       points.refresh();
-      searchPanel.value = const AddressSearchPanel.idle();
     } on AppException catch (error) {
+      _applyingSelection = false;
       searchPanel.value = AddressSearchPanel.error(index, error.message);
     }
   }
 
-  void confirmRoute() {
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+  }
+
+  RoutePlanArgs? createRoutePlan() {
+    if (!_validateSelections()) return null;
+
+    return RoutePlanArgs(
+      stops: [
+        for (final field in points)
+          if (field.selected != null) field.selected!,
+      ],
+      originLatitude: _biasLatitude,
+      originLongitude: _biasLongitude,
+    );
+  }
+
+  Future<void> confirmRoute() async {
+    if (createRoutePlan() == null) return;
+
+    if (_biasLatitude == null || _biasLongitude == null) {
+      await _loadSearchBias();
+    }
+
+    final plan = createRoutePlan();
+    if (plan == null) return;
+    Get.toNamed(AppRoutes.route, arguments: plan);
+  }
+
+  bool _validateSelections() {
     var valid = true;
 
     for (var i = 0; i < points.length; i++) {
@@ -171,7 +212,7 @@ class HomeController extends GetxController {
     }
 
     points.refresh();
-    if (!valid) return;
+    return valid;
   }
 
   String _labelFor(int index) {

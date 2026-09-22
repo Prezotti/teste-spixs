@@ -28,6 +28,8 @@
 	<string>Use sua biometria para desbloquear o Rota.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Usaremos sua localização para mostrar o ponto de partida, calcular rotas e navegar em tempo real.</string>
+	<key>GOOGLE_MAPS_API_KEY</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
