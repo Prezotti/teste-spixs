@@ -21,12 +21,18 @@ class RouteController extends GetxController {
     required DirectionsRepository directionsRepository,
     required LocationPermissionService locationPermissionService,
     required this.args,
+    Future<BitmapDescriptor> Function(int number)? numberedIcon,
+    Future<BitmapDescriptor> Function()? arrowIcon,
   }) : _directionsRepository = directionsRepository,
-       _locationPermissionService = locationPermissionService;
+       _locationPermissionService = locationPermissionService,
+       _numberedIcon = numberedIcon ?? NumberedMarkerIcon.forNumber,
+       _arrowIconLoader = arrowIcon ?? NumberedMarkerIcon.arrow;
 
   final DirectionsRepository _directionsRepository;
   final LocationPermissionService _locationPermissionService;
   final RoutePlanArgs args;
+  final Future<BitmapDescriptor> Function(int number) _numberedIcon;
+  final Future<BitmapDescriptor> Function() _arrowIconLoader;
 
   static const _offRouteSamplesNeeded = 2;
   static const _recalcCooldown = Duration(seconds: 20);
@@ -179,7 +185,7 @@ class RouteController extends GetxController {
     _offRouteSamples = 0;
     showRecalcBanner.value = false;
     try {
-      _arrowIcon ??= await NumberedMarkerIcon.arrow();
+      _arrowIcon ??= await _arrowIconLoader();
     } catch (_) {
       _arrowIcon = null;
     }
@@ -406,7 +412,7 @@ class RouteController extends GetxController {
   Future<void> _loadMarkerIcons(OptimizedRoute optimized) async {
     final icons = <int, BitmapDescriptor>{};
     for (final stop in optimized.stops) {
-      icons[stop.number] = _markerIcons[stop.number] ?? await NumberedMarkerIcon.forNumber(stop.number);
+      icons[stop.number] = _markerIcons[stop.number] ?? await _numberedIcon(stop.number);
     }
     _markerIcons
       ..clear()

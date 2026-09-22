@@ -105,4 +105,18 @@ void main() {
     expect(plan!.stops, hasLength(3));
     controller.onClose();
   });
+
+  test('asks to pick a suggestion when the text was not selected', () {
+    final controller = HomeController(
+      placesRepository: _FakePlacesRepository(details),
+      locationPermissionService: LocationPermissionService(),
+      searchDebouncer: Debouncer(delay: Duration.zero),
+    )..onInit();
+
+    controller.points[0].textController.text = 'rua das azaleias';
+    expect(controller.createRoutePlan(), isNull);
+    expect(controller.points[0].error, 'Selecione um endereço da lista');
+    expect(controller.points[1].error, 'Campo obrigatório');
+    controller.onClose();
+  });
 }
