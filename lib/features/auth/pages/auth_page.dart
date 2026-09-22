@@ -37,7 +37,7 @@ class AuthPage extends GetView<AuthController> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.space3),
-                    const UIText.display('Rota', color: AppColors.onBrand, textAlign: TextAlign.center),
+                    const UIText.display('Spixs Entregas', color: AppColors.onBrand, textAlign: TextAlign.center),
                     const SizedBox(height: AppSpacing.space2),
                     UIText.body(
                       'Entregas mais rápidas,\ncidades mais próximas.',
