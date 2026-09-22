@@ -165,24 +165,3 @@ Unitários cobrem a ordem da Routes API (incluindo o descarte da perna de volta)
 Widgets cobrem a tela de bloqueio, a home (três pontos, confirmar desligado, adicionar e remover) e a tela de permissão quando o usuário nega.
 
 Não há teste de integração no dispositivo. Ele dependeria de Play Services, GPS e da chave, e o CI não tem nenhum dos três. O comportamento de navegação está no `RouteController`, com GPS e Routes API falsos.
-
-## O que olhar na revisão
-
-| Assunto | Onde |
-|---|---|
-| Injeção e rotas | `lib/core/di/core_bindings.dart`, `lib/core/routes/app_pages.dart`, `lib/features/*/bindings` |
-| Tokens visuais | `lib/core/design`, `lib/features/home/pages/home_page.dart`, `lib/features/route/pages/route_page.dart` |
-| Erros de rede | `lib/core/network/app_http_client.dart`, `lib/core/errors/app_exception.dart` |
-| Places sem chamada sobrando | `lib/features/home/controllers/home_controller.dart`, `lib/features/home/data` |
-| Otimização da rota | `lib/features/route/data/repositories/directions_repository_impl.dart` |
-| Navegação, recálculo e bateria | `lib/features/route/controllers/route_controller.dart`, `lib/core/location/location_permission_service.dart`, `lib/features/route/domain/route_progress.dart` |
-| Chave fora do código | `.env.example`, `android/app/build.gradle.kts`, `ios/Flutter/MapsSecrets.xcconfig.example` |
-| CI | `.github/workflows/ci.yml` |
-| Testes | `test/` |
-
-## Limitações
-
-- O mapa em branco no emulador sem Play Services é limitação do dispositivo, não da chave.
-- O volume não fala a manobra.
-- Com o app em segundo plano a navegação pausa, de propósito.
-- A cota gratuita da Google é da ordem de mil requisições por mês. Por isso a busca é debounced, a sessão do Places é fechada no detalhe, e o recálculo da rota tem cooldown.
