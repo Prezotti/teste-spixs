@@ -18,14 +18,12 @@ import 'package:teste_spixs/features/route/domain/route_progress.dart';
 
 class RouteController extends GetxController with WidgetsBindingObserver {
   RouteController({
-    required DirectionsRepository directionsRepository,
-    required LocationPermissionService locationPermissionService,
+    required this._directionsRepository,
+    required this._locationPermissionService,
     required this.args,
     Future<BitmapDescriptor> Function(int number)? numberedIcon,
     Future<BitmapDescriptor> Function()? arrowIcon,
-  }) : _directionsRepository = directionsRepository,
-       _locationPermissionService = locationPermissionService,
-       _numberedIcon = numberedIcon ?? NumberedMarkerIcon.forNumber,
+  }) : _numberedIcon = numberedIcon ?? NumberedMarkerIcon.forNumber,
        _arrowIconLoader = arrowIcon ?? NumberedMarkerIcon.arrow;
 
   final DirectionsRepository _directionsRepository;

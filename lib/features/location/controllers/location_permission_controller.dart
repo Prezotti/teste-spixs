@@ -4,8 +4,8 @@ import 'package:teste_spixs/core/routes/app_routes.dart';
 
 class LocationPermissionController extends GetxController {
   LocationPermissionController({
-    required LocationPermissionService locationPermissionService,
-  }) : _locationPermissionService = locationPermissionService;
+    required this._locationPermissionService,
+  });
 
   final LocationPermissionService _locationPermissionService;
   final isRequesting = false.obs;

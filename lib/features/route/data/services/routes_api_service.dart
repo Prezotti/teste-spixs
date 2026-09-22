@@ -4,10 +4,9 @@ import 'package:teste_spixs/features/route/domain/entities/geo_point.dart';
 
 class RoutesApiService {
   RoutesApiService({
-    required AppHttpClient client,
-    required String apiKey,
-  }) : _client = client,
-       _apiKey = apiKey;
+    required this._client,
+    required this._apiKey,
+  });
 
   static const _authority = 'routes.googleapis.com';
 

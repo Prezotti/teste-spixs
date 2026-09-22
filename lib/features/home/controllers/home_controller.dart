@@ -13,12 +13,10 @@ import 'package:teste_spixs/features/route/domain/route_plan_args.dart';
 
 class HomeController extends GetxController {
   HomeController({
-    required PlacesRepository placesRepository,
-    required LocationPermissionService locationPermissionService,
+    required this._placesRepository,
+    required this._locationPermissionService,
     Debouncer? searchDebouncer,
-  }) : _placesRepository = placesRepository,
-       _locationPermissionService = locationPermissionService,
-       _debouncer = searchDebouncer ?? Debouncer();
+  }) : _debouncer = searchDebouncer ?? Debouncer();
 
   static const minStops = 3;
 

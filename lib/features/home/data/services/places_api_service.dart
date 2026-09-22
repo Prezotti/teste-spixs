@@ -3,10 +3,9 @@ import 'package:teste_spixs/core/network/app_http_client.dart';
 
 class PlacesApiService {
   PlacesApiService({
-    required AppHttpClient client,
-    required String apiKey,
-  }) : _client = client,
-       _apiKey = apiKey;
+    required this._client,
+    required this._apiKey,
+  });
 
   static const _authority = 'places.googleapis.com';
 

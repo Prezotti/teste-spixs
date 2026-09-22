@@ -8,10 +8,9 @@ import 'package:teste_spixs/features/auth/widgets/auth_retry_dialog.dart';
 
 class AuthController extends GetxController {
   AuthController({
-    required LocalAuthentication localAuth,
-    required LocationPermissionService locationPermissionService,
-  }) : _localAuth = localAuth,
-       _locationPermissionService = locationPermissionService;
+    required this._localAuth,
+    required this._locationPermissionService,
+  });
 
   final LocalAuthentication _localAuth;
   final LocationPermissionService _locationPermissionService;

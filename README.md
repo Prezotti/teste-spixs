@@ -13,7 +13,7 @@ App Flutter de roteirização de entregas. O usuário destrava o aparelho, infor
 
 ## Setup
 
-Flutter stable, com Dart `^3.11` (ver `pubspec.yaml`). Android Studio ou Xcode para o dispositivo. O mapa nativo precisa de um emulador ou aparelho com Google Play Services. Sem isso os tiles não carregam, mesmo com a chave correta.
+Flutter stable 3.47, com Dart `^3.13` (ver `pubspec.yaml`). Android Studio ou Xcode para o dispositivo. O mapa nativo precisa de um emulador ou aparelho com Google Play Services. Sem isso os tiles não carregam, mesmo com a chave correta.
 
 ### Chave Google
 
@@ -169,7 +169,7 @@ Não há teste de integração no dispositivo. Ele dependeria de Play Services, 
 ## O que olhar na revisão
 
 | Assunto | Onde |
-| --- | --- |
+|---|---|
 | Injeção e rotas | `lib/core/di/core_bindings.dart`, `lib/core/routes/app_pages.dart`, `lib/features/*/bindings` |
 | Tokens visuais | `lib/core/design`, `lib/features/home/pages/home_page.dart`, `lib/features/route/pages/route_page.dart` |
 | Erros de rede | `lib/core/network/app_http_client.dart`, `lib/core/errors/app_exception.dart` |

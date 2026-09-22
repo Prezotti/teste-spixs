@@ -5,13 +5,13 @@ import '../app_typography.dart';
 class UIText extends StatelessWidget {
   const UIText._(
     this.text, {
-    required TextStyle style,
+    required this._style,
     this.color,
     this.maxLines,
     this.overflow,
     this.textAlign,
     super.key,
-  }) : _style = style;
+  });
 
   final String text;
   final TextStyle _style;
