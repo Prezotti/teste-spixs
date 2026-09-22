@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/painting.dart';
+import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -16,7 +16,7 @@ import 'package:teste_spixs/features/route/domain/repositories/directions_reposi
 import 'package:teste_spixs/features/route/domain/route_plan_args.dart';
 import 'package:teste_spixs/features/route/domain/route_progress.dart';
 
-class RouteController extends GetxController {
+class RouteController extends GetxController with WidgetsBindingObserver {
   RouteController({
     required DirectionsRepository directionsRepository,
     required LocationPermissionService locationPermissionService,
@@ -36,6 +36,7 @@ class RouteController extends GetxController {
 
   static const _offRouteSamplesNeeded = 2;
   static const _recalcCooldown = Duration(seconds: 20);
+  static const _cameraInterval = Duration(seconds: 1);
   static const _stepArrivalMeters = 35.0;
   static const _inaccurateGpsNotice = 'Sinal de GPS impreciso. Aguardando uma leitura melhor.';
 
@@ -58,6 +59,7 @@ class RouteController extends GetxController {
   final Set<String> _visitedPlaceIds = {};
 
   StreamSubscription<Position>? _positionSub;
+  DateTime? _lastCameraMove;
   Timer? _noticeTimer;
   Timer? _recalcBannerTimer;
   BitmapDescriptor? _arrowIcon;
@@ -151,6 +153,12 @@ class RouteController extends GetxController {
   }
 
   @override
+  void onInit() {
+    super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void onReady() {
     super.onReady();
     loadRoute();
@@ -158,6 +166,7 @@ class RouteController extends GetxController {
 
   @override
   void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopPositionStream();
     _noticeTimer?.cancel();
     _recalcBannerTimer?.cancel();
@@ -190,11 +199,21 @@ class RouteController extends GetxController {
       _arrowIcon = null;
     }
     isNavigating.value = true;
+    _lastCameraMove = null;
     markersTick.value++;
-    _positionSub = _locationPermissionService.watch().listen(
-      _onPosition,
-      onError: (_) => _reportGpsFailure(),
-    );
+    _startPositionStream();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _lastCameraMove = null;
+      _resumePositionStream();
+      return;
+    }
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _pausePositionStream();
+    }
   }
 
   void stopNavigation() {
@@ -344,6 +363,24 @@ class RouteController extends GetxController {
     });
   }
 
+  void _startPositionStream() {
+    _stopPositionStream();
+    _positionSub = _locationPermissionService.watch().listen(
+      _onPosition,
+      onError: (_) => _reportGpsFailure(),
+    );
+  }
+
+  void _pausePositionStream() {
+    if (!isNavigating.value) return;
+    _stopPositionStream();
+  }
+
+  void _resumePositionStream() {
+    if (!isNavigating.value || _positionSub != null) return;
+    _startPositionStream();
+  }
+
   void _stopPositionStream() {
     _positionSub?.cancel();
     _positionSub = null;
@@ -352,6 +389,10 @@ class RouteController extends GetxController {
   Future<void> _follow(GeoPoint here) async {
     final map = _mapController;
     if (map == null) return;
+    final now = DateTime.now();
+    final lastMove = _lastCameraMove;
+    if (lastMove != null && now.difference(lastMove) < _cameraInterval) return;
+    _lastCameraMove = now;
     final target = LatLng(here.latitude, here.longitude);
     try {
       await map.animateCamera(

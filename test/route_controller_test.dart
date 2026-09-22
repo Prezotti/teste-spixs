@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -207,6 +208,21 @@ void main() {
     expect(controller.isRecalculating.value, isFalse);
     expect(controller.isNavigating.value, isTrue);
     await flushNotice(tester);
+  });
+
+  testWidgets('stops reading GPS while the app is in the background', (tester) async {
+    await controller.startNavigation();
+    controller.didChangeAppLifecycleState(AppLifecycleState.paused);
+    location.positions.add(fix(latitude: 0, longitude: 0.0005, accuracy: 8));
+    await tester.pump();
+
+    expect(controller.userPosition.value, isNull);
+
+    controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    location.positions.add(fix(latitude: 0, longitude: 0.0005, accuracy: 8));
+    await tester.pump();
+
+    expect(controller.userPosition.value?.latitude, 0);
   });
 
   testWidgets('shows an error when the first route request fails', (tester) async {

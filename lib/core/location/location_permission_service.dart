@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LocationPermissionService {
@@ -27,10 +28,7 @@ class LocationPermissionService {
 
   Stream<Position> watch() {
     return Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 20,
-      ),
+      locationSettings: navigationLocationSettings(defaultTargetPlatform),
     );
   }
 
@@ -67,4 +65,32 @@ class LocationPermissionService {
     return permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;
   }
+}
+
+LocationSettings navigationLocationSettings(TargetPlatform platform) {
+  const accuracy = LocationAccuracy.high;
+  const distanceFilter = 20;
+
+  if (platform == TargetPlatform.android) {
+    return AndroidSettings(
+      accuracy: accuracy,
+      distanceFilter: distanceFilter,
+      intervalDuration: const Duration(seconds: 5),
+    );
+  }
+
+  if (platform == TargetPlatform.iOS) {
+    return AppleSettings(
+      accuracy: accuracy,
+      distanceFilter: distanceFilter,
+      activityType: ActivityType.automotiveNavigation,
+      pauseLocationUpdatesAutomatically: true,
+      allowBackgroundLocationUpdates: false,
+    );
+  }
+
+  return const LocationSettings(
+    accuracy: accuracy,
+    distanceFilter: distanceFilter,
+  );
 }
