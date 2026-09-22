@@ -16,6 +16,9 @@ class RouteProgress {
 abstract final class RouteProgressEvaluator {
   static const deviationThresholdMeters = 80.0;
   static const arrivalThresholdMeters = 45.0;
+  static const maxAccuracyMeters = 50.0;
+
+  static bool acceptsFix(double accuracyMeters) => accuracyMeters <= maxAccuracyMeters;
 
   static RouteProgress evaluate({
     required GeoPoint position,

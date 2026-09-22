@@ -59,4 +59,9 @@ void main() {
       greaterThan(RouteProgressEvaluator.deviationThresholdMeters),
     );
   });
+
+  test('rejects a GPS fix less accurate than 50 meters', () {
+    expect(RouteProgressEvaluator.acceptsFix(50), isTrue);
+    expect(RouteProgressEvaluator.acceptsFix(51), isFalse);
+  });
 }

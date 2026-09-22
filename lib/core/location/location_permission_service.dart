@@ -55,6 +55,14 @@ class LocationPermissionService {
     }
   }
 
+  Future<bool> isServiceEnabled() async {
+    try {
+      return await Geolocator.isLocationServiceEnabled();
+    } catch (_) {
+      return true;
+    }
+  }
+
   bool _isGranted(LocationPermission permission) {
     return permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;

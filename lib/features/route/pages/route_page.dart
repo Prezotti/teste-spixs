@@ -129,11 +129,28 @@ class _NavBanner extends GetView<RouteController> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      final recalculating = controller.isRecalculating.value;
       final recalculated = controller.showRecalcBanner.value;
+      final message = controller.notice.value;
       controller.userPosition.value;
       controller.route.value;
+      final warning = recalculating || recalculated || message != null;
+      final Widget body;
+      if (recalculating) {
+        body = const _StatusBannerBody(
+          title: 'Recalculando…',
+          body: 'Atualizando a rota com os pontos restantes.',
+          busy: true,
+        );
+      } else if (recalculated) {
+        body = const _RecalcBannerBody();
+      } else if (message != null) {
+        body = _StatusBannerBody(body: message);
+      } else {
+        body = const _ManeuverBannerBody();
+      }
       return Material(
-        color: recalculated ? AppColors.warning : AppColors.success,
+        color: warning ? AppColors.warning : AppColors.success,
         child: SafeArea(
           bottom: false,
           child: Padding(
@@ -143,7 +160,7 @@ class _NavBanner extends GetView<RouteController> {
               AppSpacing.space3,
               AppSpacing.space3,
             ),
-            child: recalculated ? const _RecalcBannerBody() : const _ManeuverBannerBody(),
+            child: body,
           ),
         ),
       );
@@ -177,6 +194,55 @@ class _ManeuverBannerBody extends GetView<RouteController> {
                 color: AppColors.onBrand,
               ),
               UIText.body(instruction, color: AppColors.onBrand, maxLines: 2),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusBannerBody extends StatelessWidget {
+  const _StatusBannerBody({
+    this.title,
+    required this.body,
+    this.busy = false,
+  });
+
+  final String? title;
+  final String body;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (busy)
+          const SizedBox(
+            width: AppSpacing.space4,
+            height: AppSpacing.space4,
+            child: CircularProgressIndicator(
+              strokeWidth: AppSpacing.space1,
+              color: AppColors.onBrand,
+            ),
+          )
+        else
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.onBrand,
+            size: AppSpacing.space4,
+          ),
+        const SizedBox(width: AppSpacing.space3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (title != null) ...[
+                UIText.heading(title!, color: AppColors.onBrand),
+                const SizedBox(height: AppSpacing.space1),
+              ],
+              UIText.body(body, color: AppColors.onBrand, maxLines: 3),
             ],
           ),
         ),

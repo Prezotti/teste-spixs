@@ -31,6 +31,7 @@ class RouteController extends GetxController {
   static const _offRouteSamplesNeeded = 2;
   static const _recalcCooldown = Duration(seconds: 20);
   static const _stepArrivalMeters = 35.0;
+  static const _inaccurateGpsNotice = 'Sinal de GPS impreciso. Aguardando uma leitura melhor.';
 
   final isLoading = false.obs;
   final errorText = Rxn<String>();
@@ -129,14 +130,14 @@ class RouteController extends GetxController {
     final current = route.value;
     if (current == null) return const {};
 
-    final recalculated = showRecalcBanner.value;
+    final updating = showRecalcBanner.value || isRecalculating.value;
     return {
       Polyline(
         polylineId: const PolylineId('optimized-route'),
         points: [for (final point in current.polyline) LatLng(point.latitude, point.longitude)],
-        color: recalculated ? AppColors.warning : AppColors.brand,
+        color: updating ? AppColors.warning : AppColors.brand,
         width: AppSpacing.space1.toInt(),
-        patterns: recalculated
+        patterns: updating
             ? [PatternItem.dash(20), PatternItem.gap(12)]
             : const <PatternItem>[],
       ),
@@ -163,7 +164,12 @@ class RouteController extends GetxController {
 
     final granted = await _locationPermissionService.isGranted() || await _locationPermissionService.request();
     if (!granted) {
-      _showNotice('Ative a localização para navegar.');
+      _showNotice('Permissão de localização negada. Ative para navegar.');
+      return;
+    }
+
+    if (!await _locationPermissionService.isServiceEnabled()) {
+      _showNotice('O GPS do celular está desligado. Ative para navegar.');
       return;
     }
 
@@ -181,7 +187,7 @@ class RouteController extends GetxController {
     markersTick.value++;
     _positionSub = _locationPermissionService.watch().listen(
       _onPosition,
-      onError: (_) => _showNotice('Não foi possível ler o GPS. Tente novamente.'),
+      onError: (_) => _reportGpsFailure(),
     );
   }
 
@@ -192,6 +198,10 @@ class RouteController extends GetxController {
     isRecalculating.value = false;
     showRecalcBanner.value = false;
     userPosition.value = null;
+    if (notice.value == _inaccurateGpsNotice) {
+      notice.value = null;
+      _noticeTimer?.cancel();
+    }
     markersTick.value++;
     _faceNorth(here);
   }
@@ -199,6 +209,15 @@ class RouteController extends GetxController {
   void _onPosition(Position position) {
     final current = route.value;
     if (!isNavigating.value || current == null) return;
+
+    if (!RouteProgressEvaluator.acceptsFix(position.accuracy)) {
+      _showNotice(_inaccurateGpsNotice, sticky: true);
+      return;
+    }
+    if (notice.value == _inaccurateGpsNotice) {
+      notice.value = null;
+      _noticeTimer?.cancel();
+    }
 
     final here = GeoPoint(position.latitude, position.longitude);
     userPosition.value = here;
@@ -253,6 +272,9 @@ class RouteController extends GetxController {
   Future<void> _recalculate(GeoPoint here, List<PlaceDetails> remaining, {required bool announce}) async {
     if (isRecalculating.value || remaining.isEmpty) return;
     isRecalculating.value = true;
+    markersTick.value++;
+    notice.value = null;
+    _noticeTimer?.cancel();
     _lastRecalcAt = DateTime.now();
     _offRouteSamples = 0;
 
@@ -273,7 +295,19 @@ class RouteController extends GetxController {
       _showNotice('Não foi possível recalcular a rota.');
     } finally {
       isRecalculating.value = false;
+      markersTick.value++;
     }
+  }
+
+  Future<void> _reportGpsFailure() async {
+    if (!isNavigating.value) return;
+    final enabled = await _locationPermissionService.isServiceEnabled();
+    if (!isNavigating.value) return;
+    _showNotice(
+      enabled
+          ? 'Não foi possível ler o GPS. Tente novamente.'
+          : 'O GPS do celular está desligado.',
+    );
   }
 
   void _showRecalcBanner() {
@@ -295,9 +329,10 @@ class RouteController extends GetxController {
     }
   }
 
-  void _showNotice(String message) {
+  void _showNotice(String message, {bool sticky = false}) {
     notice.value = message;
     _noticeTimer?.cancel();
+    if (sticky) return;
     _noticeTimer = Timer(const Duration(seconds: 5), () {
       if (notice.value == message) notice.value = null;
     });
