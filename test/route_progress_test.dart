@@ -60,8 +60,8 @@ void main() {
     );
   });
 
-  test('rejects a GPS fix less accurate than 50 meters', () {
-    expect(RouteProgressEvaluator.acceptsFix(50), isTrue);
-    expect(RouteProgressEvaluator.acceptsFix(51), isFalse);
+  test('rejects a GPS fix less accurate than 100 meters', () {
+    expect(RouteProgressEvaluator.acceptsFix(100), isTrue);
+    expect(RouteProgressEvaluator.acceptsFix(101), isFalse);
   });
 }

@@ -127,7 +127,7 @@ class DirectionsRepositoryImpl implements DirectionsRepository {
       stops: [
         for (var i = 0; i < orderedStops.length; i++)
           RouteStop(
-            number: i + 1,
+            number: (hasOrigin ? 2 : 1) + i,
             place: orderedStops[i],
             legDistanceMeters: i < legDistances.length ? legDistances[i] : 0,
             legDurationSeconds: i < legDurations.length ? legDurations[i] : 0,

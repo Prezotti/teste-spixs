@@ -6,8 +6,8 @@ App Flutter de roteirização de entregas. O usuário destrava o aparelho, infor
 
 1. **Bloqueio.** Face ID ou digital. Se não houver biometria, ou se a tentativa falhar ou for cancelada, dá para entrar com a senha ou o PIN do celular.
 2. **Localização.** O app pede permissão antes da home. "Agora não" segue sem GPS; a busca de endereço continua, só que sem viés de proximidade.
-3. **Endereços.** Três campos obrigatórios e "Adicionar ponto" sem limite fixo. Cada ponto extra pode ser removido. Só vale um endereço escolhido na lista, não texto livre.
-4. **Rota otimizada.** A Routes API reordena as paradas. O mapa desenha o traçado e numera os marcadores nessa ordem, não na ordem digitada.
+3. **Endereços.** Três campos obrigatórios e "Adicionar ponto" sem limite fixo. Tocar num campo abre a busca em tela cheia. Cada ponto extra pode ser removido. Só vale um endereço escolhido na lista, não texto livre.
+4. **Rota otimizada.** O ponto 1 é sempre a localização atual. A Routes API reordena os endereços digitados a partir do ponto 2.
 5. **Navegação.** "Iniciar" abre o modo de curva a curva: banner da manobra, próximo destino, progresso "1 de N" e seta acompanhando o GPS.
 6. **Recálculo.** Desvio confirmado gera uma rota nova só com as paradas que faltam. O banner laranja avisa o que aconteceu.
 
@@ -138,7 +138,7 @@ Os marcadores são círculos numerados na ordem otimizada, desenhados em bitmap.
 
 ### Navegação e recálculo
 
-Chegada: até 45 m da parada. Desvio: mais de 80 m da polyline, em duas leituras seguidas, com 20 s de intervalo entre chamadas da API. Leitura com precisão pior que 50 m não conta como chegada nem como desvio.
+Chegada: até 45 m da parada. Desvio: mais de 40 m da polyline, em duas leituras seguidas, com 20 s de intervalo entre chamadas da API. Leitura com precisão pior que 100 m não conta como chegada nem como desvio.
 
 Enquanto a API responde, o banner mostra "Recalculando…". Sucesso vira "Rota recalculada" por 5 s e a linha fica tracejada em `warning`. Falha da API ou do GPS aparece no mesmo banner. Permissão negada e GPS desligado têm textos diferentes, e os dois são checados antes de abrir o stream.
 
@@ -151,10 +151,10 @@ O stream contínuo só existe depois de "Iniciar" e é cancelado ao encerrar, ao
 | Momento | Comportamento |
 | --- | --- |
 | Busca de endereço | Última posição conhecida. Se não houver, uma leitura de precisão média com limite de 2 s. |
-| Navegação no Android | Alta precisão, no máximo um ponto a cada 5 s, e só depois de 20 m. |
-| Navegação no iOS | `automotiveNavigation`, pausa automática quando a posição não muda, sem update em background. |
+| Navegação no Android | Alta precisão, cerca de um ponto por segundo, depois de andar 5 m. |
+| Navegação no iOS | Atualização a cada 5 m, pausa automática parado, sem update em background. |
 | App em segundo plano | O stream é cancelado. Ao voltar, a navegação retoma. |
-| Câmera | No máximo uma animação por segundo. O marcador continua atualizando a cada leitura válida. |
+| Câmera | No máximo uma animação a cada 300 ms. O marcador continua atualizando a cada leitura válida. |
 
 A navegação não continua com a tela desligada. Manter o GPS em background exigiria um serviço em primeiro plano e gastaria bateria sem o usuário olhando o mapa.
 

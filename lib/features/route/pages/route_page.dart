@@ -545,6 +545,10 @@ class _OrderCollapse extends GetView<RouteController> {
                         ),
                         child: Column(
                           children: [
+                            if (route.origin != null) ...[
+                              const _OrderRow(number: 1, title: 'Sua localização'),
+                              if (route.stops.isNotEmpty) const SizedBox(height: AppSpacing.space2),
+                            ],
                             for (var i = 0; i < route.stops.length; i++) ...[
                               if (i > 0) const SizedBox(height: AppSpacing.space2),
                               _OrderRow(

@@ -143,7 +143,7 @@ void main() {
 
   testWidgets('ignores an inaccurate fix near a stop', (tester) async {
     await controller.startNavigation();
-    location.positions.add(fix(latitude: 0, longitude: 0, accuracy: 80));
+    location.positions.add(fix(latitude: 0, longitude: 0, accuracy: 120));
     await tester.pump();
 
     expect(controller.notice.value, 'Sinal de GPS impreciso. Aguardando uma leitura melhor.');

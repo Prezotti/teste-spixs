@@ -34,7 +34,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
 
   static const _offRouteSamplesNeeded = 2;
   static const _recalcCooldown = Duration(seconds: 20);
-  static const _cameraInterval = Duration(seconds: 1);
+  static const _cameraInterval = Duration(milliseconds: 300);
   static const _stepArrivalMeters = 35.0;
   static const _inaccurateGpsNotice = 'Sinal de GPS impreciso. Aguardando uma leitura melhor.';
 
@@ -81,6 +81,15 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     if (current == null) return const {};
 
     final markers = <Marker>{
+      if (current.origin != null && _markerIcons[1] != null)
+        Marker(
+          markerId: const MarkerId('origin'),
+          position: LatLng(current.origin!.latitude, current.origin!.longitude),
+          infoWindow: const InfoWindow(title: '1', snippet: 'Sua localização'),
+          icon: _markerIcons[1]!,
+          anchor: const Offset(0.5, 0.5),
+          zIndexInt: 1,
+        ),
       for (final stop in current.stops)
         if (_markerIcons[stop.number] != null)
           Marker(
@@ -450,6 +459,9 @@ class RouteController extends GetxController with WidgetsBindingObserver {
 
   Future<void> _loadMarkerIcons(OptimizedRoute optimized) async {
     final icons = <int, BitmapDescriptor>{};
+    if (optimized.origin != null) {
+      icons[1] = _markerIcons[1] ?? await _numberedIcon(1);
+    }
     for (final stop in optimized.stops) {
       icons[stop.number] = _markerIcons[stop.number] ?? await _numberedIcon(stop.number);
     }

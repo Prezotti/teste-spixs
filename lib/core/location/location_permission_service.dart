@@ -32,6 +32,21 @@ class LocationPermissionService {
     );
   }
 
+  Future<Position?> currentPosition() async {
+    if (!await isGranted()) return null;
+
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (_) {
+      return Geolocator.getLastKnownPosition();
+    }
+  }
+
   Future<Position?> currentOrLast() async {
     if (!await isGranted()) return null;
 
@@ -69,13 +84,13 @@ class LocationPermissionService {
 
 LocationSettings navigationLocationSettings(TargetPlatform platform) {
   const accuracy = LocationAccuracy.high;
-  const distanceFilter = 20;
+  const distanceFilter = 5;
 
   if (platform == TargetPlatform.android) {
     return AndroidSettings(
       accuracy: accuracy,
       distanceFilter: distanceFilter,
-      intervalDuration: const Duration(seconds: 5),
+      intervalDuration: const Duration(seconds: 1),
     );
   }
 
@@ -83,7 +98,7 @@ LocationSettings navigationLocationSettings(TargetPlatform platform) {
     return AppleSettings(
       accuracy: accuracy,
       distanceFilter: distanceFilter,
-      activityType: ActivityType.automotiveNavigation,
+      activityType: ActivityType.other,
       pauseLocationUpdatesAutomatically: true,
       allowBackgroundLocationUpdates: false,
     );

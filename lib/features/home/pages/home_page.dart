@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:teste_spixs/core/design/design.dart';
 import 'package:teste_spixs/features/home/controllers/address_field.dart';
 import 'package:teste_spixs/features/home/controllers/home_controller.dart';
-import 'package:teste_spixs/features/home/widgets/place_suggestions_list.dart';
+import 'package:teste_spixs/features/home/pages/address_search_page.dart';
 
 class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
@@ -59,14 +59,18 @@ class HomePage extends GetView<HomeController> {
               const SizedBox(height: AppSpacing.space3),
               Obx(
                 () => UIPrimaryButton(
-                  label: 'Confirmar rota',
-                  onPressed: controller.canConfirm.value
-                      ? controller.confirmRoute
-                      : null,
+                  label: controller.isConfirming.value ? 'Buscando localização...' : 'Confirmar rota',
+                  onPressed: controller.canConfirm.value ? controller.confirmRoute : null,
                 ),
               ),
               const SizedBox(height: AppSpacing.space2),
               Obx(() {
+                final error = controller.confirmError.value;
+                if (error != null) {
+                  return Center(
+                    child: UIText.caption(error, color: AppColors.danger, textAlign: TextAlign.center),
+                  );
+                }
                 if (controller.canConfirm.value) {
                   return const SizedBox.shrink();
                 }
@@ -105,10 +109,10 @@ class _AddressFieldRow extends GetView<HomeController> {
               child: UIPrimaryInput(
                 key: ObjectKey(field),
                 controller: field.textController,
-                focusNode: field.focusNode,
                 hintText: field.label,
                 errorText: field.error,
-                onChanged: (value) => controller.onQueryChanged(index, value),
+                readOnly: true,
+                onTap: () => Get.to(() => AddressSearchPage(index: index)),
                 onClear: () => controller.onClear(index),
               ),
             ),
@@ -125,18 +129,6 @@ class _AddressFieldRow extends GetView<HomeController> {
               ),
           ],
         ),
-        Obx(() {
-          final panel = controller.searchPanel.value;
-          if (panel.index != index) return const SizedBox.shrink();
-
-          return PlaceSuggestionsList(
-            suggestions: panel.suggestions,
-            isLoading: panel.isLoading,
-            errorText: panel.errorText,
-            onSelected: (prediction) =>
-                controller.selectPrediction(index, prediction),
-          );
-        }),
       ],
     );
   }

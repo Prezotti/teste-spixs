@@ -17,6 +17,9 @@ class UIPrimaryInput extends StatefulWidget {
     this.focusNode,
     this.onChanged,
     this.onClear,
+    this.onTap,
+    this.readOnly = false,
+    this.autofocus = false,
   });
 
   final TextEditingController? controller;
@@ -26,6 +29,9 @@ class UIPrimaryInput extends StatefulWidget {
   final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onClear;
+  final VoidCallback? onTap;
+  final bool readOnly;
+  final bool autofocus;
 
   @override
   State<UIPrimaryInput> createState() => _UIPrimaryInputState();
@@ -72,6 +78,9 @@ class _UIPrimaryInputState extends State<UIPrimaryInput> {
         TextField(
           controller: _controller,
           focusNode: widget.focusNode,
+          readOnly: widget.readOnly,
+          autofocus: widget.autofocus,
+          onTap: widget.onTap,
           onChanged: widget.onChanged,
           style: AppTypography.body,
           cursorColor: AppColors.brand,

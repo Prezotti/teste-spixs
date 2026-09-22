@@ -27,6 +27,8 @@ class HomeController extends GetxController {
   final points = <AddressField>[].obs;
   final searchPanel = const AddressSearchPanel.idle().obs;
   final canConfirm = false.obs;
+  final isConfirming = false.obs;
+  final confirmError = RxnString();
 
   int _searchSeq = 0;
   String? _sessionToken;
@@ -134,7 +136,7 @@ class HomeController extends GetxController {
   Future<void> selectPrediction(int index, PlacePrediction prediction) async {
     _debouncer.cancel();
     _dismissKeyboard();
-    searchPanel.value = const AddressSearchPanel.idle();
+    searchPanel.value = AddressSearchPanel.loading(index);
 
     try {
       _ensureSession(index);
@@ -152,6 +154,7 @@ class HomeController extends GetxController {
       _endSession();
       _syncCanConfirm();
       points.refresh();
+      searchPanel.value = const AddressSearchPanel.idle();
     } on AppException catch (error) {
       _applyingSelection = false;
       searchPanel.value = AddressSearchPanel.error(index, error.message);
@@ -177,15 +180,31 @@ class HomeController extends GetxController {
   }
 
   Future<void> confirmRoute() async {
-    if (createRoutePlan() == null) return;
+    if (isConfirming.value || createRoutePlan() == null) return;
 
-    if (_biasLatitude == null || _biasLongitude == null) {
-      await _loadSearchBias();
+    isConfirming.value = true;
+    confirmError.value = null;
+    try {
+      final granted = await _locationPermissionService.isGranted() || await _locationPermissionService.request();
+      if (!granted) {
+        confirmError.value = 'Ative a localização. A rota começa em você.';
+        return;
+      }
+
+      final position = await _locationPermissionService.currentPosition();
+      if (position == null) {
+        confirmError.value = 'Não foi possível ler sua localização para iniciar a rota.';
+        return;
+      }
+
+      _biasLatitude = position.latitude;
+      _biasLongitude = position.longitude;
+      final plan = createRoutePlan();
+      if (plan == null || !plan.hasOrigin) return;
+      Get.toNamed(AppRoutes.route, arguments: plan);
+    } finally {
+      isConfirming.value = false;
     }
-
-    final plan = createRoutePlan();
-    if (plan == null) return;
-    Get.toNamed(AppRoutes.route, arguments: plan);
   }
 
   bool _validateSelections() {

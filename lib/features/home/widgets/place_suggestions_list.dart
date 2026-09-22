@@ -9,12 +9,14 @@ class PlaceSuggestionsList extends StatelessWidget {
     required this.isLoading,
     this.errorText,
     required this.onSelected,
+    this.expanded = false,
   });
 
   final List<PlacePrediction> suggestions;
   final bool isLoading;
   final String? errorText;
   final ValueChanged<PlacePrediction> onSelected;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -22,16 +24,7 @@ class PlaceSuggestionsList extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.space1),
-      decoration: BoxDecoration(
-        color: AppColors.surface200,
-        borderRadius: AppRadius.mdAll,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    final tiles = <Widget>[
           if (isLoading)
             const Padding(
               padding: AppSpacing.card,
@@ -64,7 +57,25 @@ class PlaceSuggestionsList extends StatelessWidget {
                 ),
               ),
             ),
-        ],
+    ];
+
+    if (expanded) {
+      return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: tiles,
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.space1),
+      decoration: BoxDecoration(
+        color: AppColors.surface200,
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: tiles,
       ),
     );
   }
