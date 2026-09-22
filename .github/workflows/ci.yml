@@ -11,6 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create an empty env file
+        run: cp .env.example .env
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
