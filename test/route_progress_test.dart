@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_details.dart';
 import 'package:teste_spixs/features/route/domain/entities/geo_point.dart';
+import 'package:teste_spixs/features/route/domain/entities/route_maneuver.dart';
 import 'package:teste_spixs/features/route/domain/entities/route_stop.dart';
 import 'package:teste_spixs/features/route/domain/route_progress.dart';
 
@@ -99,5 +100,29 @@ void main() {
   test('rejects a GPS fix less accurate than 100 meters', () {
     expect(RouteProgressEvaluator.acceptsFix(100), isTrue);
     expect(RouteProgressEvaluator.acceptsFix(101), isFalse);
+  });
+
+  test('moves to the next instruction after the step end is passed', () {
+    const maneuvers = [
+      RouteManeuver(instruction: 'Siga em frente', maneuver: 'STRAIGHT', end: GeoPoint(0, 0.001)),
+      RouteManeuver(instruction: 'Vire à direita', maneuver: 'TURN_RIGHT', end: GeoPoint(0, 0.002)),
+    ];
+
+    expect(
+      RouteProgressEvaluator.activeManeuverIndex(
+        position: const GeoPoint(0, 0.0005),
+        maneuvers: maneuvers,
+        currentIndex: 0,
+      ),
+      0,
+    );
+    expect(
+      RouteProgressEvaluator.activeManeuverIndex(
+        position: const GeoPoint(0, 0.0015),
+        maneuvers: maneuvers,
+        currentIndex: 0,
+      ),
+      1,
+    );
   });
 }

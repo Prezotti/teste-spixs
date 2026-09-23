@@ -78,6 +78,7 @@ void main() {
   late _FakeLocation location;
   late _FakeDirections directions;
   late RouteController controller;
+  late DateTime clock;
 
   RouteController buildController() {
     return RouteController(
@@ -86,6 +87,7 @@ void main() {
       args: const RoutePlanArgs(stops: [stopA, stopB], originLatitude: 0, originLongitude: 0),
       numberedIcon: (_) async => BitmapDescriptor.defaultMarker,
       arrowIcon: () async => BitmapDescriptor.defaultMarker,
+      now: () => clock,
     );
   }
 
@@ -94,6 +96,7 @@ void main() {
   }
 
   setUp(() {
+    clock = DateTime.utc(2026);
     location = _FakeLocation();
     directions = _FakeDirections(sample);
     controller = buildController()..route.value = sample;
@@ -104,7 +107,12 @@ void main() {
     location.positions.close();
   });
 
-  Position fix({required double latitude, required double longitude, required double accuracy}) {
+  Position fix({
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    double speed = 0,
+  }) {
     return Position(
       latitude: latitude,
       longitude: longitude,
@@ -114,7 +122,7 @@ void main() {
       altitudeAccuracy: 0,
       heading: 0,
       headingAccuracy: 0,
-      speed: 0,
+      speed: speed,
       speedAccuracy: 0,
     );
   }
@@ -156,8 +164,6 @@ void main() {
     await controller.startNavigation();
     final atStop = fix(latitude: 0.00012, longitude: 0, accuracy: 8);
     location.positions.add(atStop);
-    location.positions.add(atStop);
-    await tester.pump();
     await tester.pump();
 
     expect(directions.calls, 0);
@@ -165,6 +171,24 @@ void main() {
     expect(controller.showRecalcBanner.value, isFalse);
     expect(controller.progressIndex.value, 2);
     expect(controller.isNavigating.value, isTrue);
+    controller.onClose();
+  });
+
+  testWidgets('glides the marker between GPS fixes', (tester) async {
+    await controller.startNavigation();
+    location.positions.add(fix(latitude: 0, longitude: 0, accuracy: 8));
+    await tester.pump();
+    clock = clock.add(const Duration(milliseconds: 800));
+    location.positions.add(fix(latitude: 0, longitude: 0.0002, accuracy: 8));
+    await tester.pump();
+    clock = clock.add(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final longitude = controller.userPosition.value?.longitude;
+    expect(longitude, isNotNull);
+    expect(longitude!, greaterThan(0.00008));
+    expect(longitude, lessThan(0.00012));
+    controller.onClose();
   });
 
   testWidgets('finishes the route without asking for another path', (tester) async {
@@ -192,6 +216,7 @@ void main() {
     expect(controller.isRecalculating.value, isFalse);
     expect(controller.isNavigating.value, isTrue);
     await flushNotice(tester);
+    controller.onClose();
   });
 
   testWidgets('keeps the recalculating state until the new route arrives', (tester) async {
@@ -214,6 +239,7 @@ void main() {
     expect(controller.isRecalculating.value, isFalse);
     expect(controller.showRecalcBanner.value, isTrue);
     await flushNotice(tester);
+    controller.onClose();
   });
 
   testWidgets('shows the API error when a recalculation fails', (tester) async {
@@ -235,6 +261,7 @@ void main() {
     expect(controller.isRecalculating.value, isFalse);
     expect(controller.isNavigating.value, isTrue);
     await flushNotice(tester);
+    controller.onClose();
   });
 
   testWidgets('stops reading GPS while the app is in the background', (tester) async {
@@ -250,6 +277,7 @@ void main() {
     await tester.pump();
 
     expect(controller.userPosition.value?.latitude, 0);
+    controller.onClose();
   });
 
   testWidgets('shows an error when the first route request fails', (tester) async {

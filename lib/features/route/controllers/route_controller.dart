@@ -14,6 +14,8 @@ import 'package:teste_spixs/features/route/domain/entities/geo_point.dart';
 import 'package:teste_spixs/features/route/domain/entities/route_completion.dart';
 import 'package:teste_spixs/features/route/domain/entities/optimized_route.dart';
 import 'package:teste_spixs/features/route/domain/entities/route_maneuver.dart';
+import 'package:teste_spixs/features/route/domain/entities/route_stop.dart';
+import 'package:teste_spixs/features/route/domain/marker_glide.dart';
 import 'package:teste_spixs/features/route/domain/repositories/directions_repository.dart';
 import 'package:teste_spixs/features/route/domain/route_plan_args.dart';
 import 'package:teste_spixs/features/route/domain/route_progress.dart';
@@ -25,19 +27,24 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     required this.args,
     Future<BitmapDescriptor> Function(int number)? numberedIcon,
     Future<BitmapDescriptor> Function()? arrowIcon,
+    DateTime Function()? now,
   }) : _numberedIcon = numberedIcon ?? NumberedMarkerIcon.forNumber,
-       _arrowIconLoader = arrowIcon ?? NumberedMarkerIcon.arrow;
+       _arrowIconLoader = arrowIcon ?? NumberedMarkerIcon.arrow,
+       _now = now ?? DateTime.now;
 
   final DirectionsRepository _directionsRepository;
   final LocationPermissionService _locationPermissionService;
   final RoutePlanArgs args;
   final Future<BitmapDescriptor> Function(int number) _numberedIcon;
   final Future<BitmapDescriptor> Function() _arrowIconLoader;
+  final DateTime Function() _now;
 
   static const _offRouteSamplesNeeded = 2;
   static const _recalcCooldown = Duration(seconds: 20);
-  static const _cameraInterval = Duration(milliseconds: 300);
-  static const _stepArrivalMeters = 35.0;
+  static const _cameraInterval = Duration(milliseconds: 100);
+  static const _glideTick = Duration(milliseconds: 50);
+  static const _minGlide = Duration(milliseconds: 400);
+  static const _maxGlide = Duration(milliseconds: 1200);
   static const _inaccurateGpsNotice = 'Sinal de GPS impreciso. Aguardando uma leitura melhor.';
 
   final isLoading = false.obs;
@@ -54,18 +61,22 @@ class RouteController extends GetxController with WidgetsBindingObserver {
   final voiceOn = true.obs;
   final progressIndex = 1.obs;
   final progressTotal = 0.obs;
+  final activeManeuverIndex = 0.obs;
 
   final Map<int, BitmapDescriptor> _markerIcons = {};
   final Set<String> _visitedPlaceIds = {};
 
   StreamSubscription<Position>? _positionSub;
+  Timer? _glideTimer;
+  _MarkerSlide? _slide;
+  Position? _lastFix;
+  DateTime? _lastGlideAt;
   DateTime? _lastCameraMove;
   Timer? _noticeTimer;
   Timer? _recalcBannerTimer;
   RouteCompletion? _completion;
   BitmapDescriptor? _arrowIcon;
   var _offRouteSamples = 0;
-  var _maneuverIndex = 0;
   var _routeSegment = 0;
   List<GeoPoint> _visiblePolyline = const [];
   DateTime? _lastRecalcAt;
@@ -119,7 +130,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
   RouteManeuver? get activeManeuver {
     final maneuvers = route.value?.maneuvers ?? const [];
     if (maneuvers.isEmpty) return null;
-    final index = _maneuverIndex.clamp(0, maneuvers.length - 1);
+    final index = activeManeuverIndex.value.clamp(0, maneuvers.length - 1);
     return maneuvers[index];
   }
 
@@ -202,9 +213,10 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     );
     progressTotal.value = planned.stops.length;
     progressIndex.value = 1;
-    _maneuverIndex = 0;
+    activeManeuverIndex.value = 0;
     _offRouteSamples = 0;
     _resetPolylineProgress();
+    _resetMotion();
     showRecalcBanner.value = false;
     try {
       _arrowIcon ??= await _arrowIconLoader();
@@ -258,25 +270,37 @@ class RouteController extends GetxController with WidgetsBindingObserver {
       _noticeTimer?.cancel();
     }
 
+    _lastFix = position;
     final here = GeoPoint(position.latitude, position.longitude);
-    userPosition.value = here;
-    _trimPolyline(here, current.polyline);
-    if (position.heading >= 0 && position.heading <= 360) {
-      userHeading.value = position.heading;
+    _glideTo(_matchedPoint(current, here), position.heading);
+    if (_slide == null) _publishFrame(userPosition.value ?? here, current);
+    _ensureGlideTimer();
+    _afterFix(current, here, countDeviation: true);
+  }
+
+  void _onGlideTick() {
+    if (!isNavigating.value) return;
+    final slide = _slide;
+    final current = route.value;
+    if (slide != null && current != null) {
+      final elapsed = _now().difference(slide.started).inMilliseconds;
+      final t = elapsed / slide.duration.inMilliseconds;
+      final point = MarkerGlide.pointBetween(slide.from, slide.to, t);
+      userHeading.value = MarkerGlide.headingBetween(slide.fromHeading, slide.toHeading, t);
+      _publishFrame(point, current);
+      if (t >= 1) _slide = null;
     }
-    _advanceManeuver(current, here);
-    markersTick.value++;
-    _follow(here);
+    final fix = _lastFix;
+    if (!isNavigating.value || current == null || fix == null) return;
+    _afterFix(current, GeoPoint(fix.latitude, fix.longitude), countDeviation: false);
+  }
 
-    final progress = RouteProgressEvaluator.evaluate(
-      position: here,
-      polyline: current.polyline,
-      stops: current.stops,
-      alreadyVisited: _visitedPlaceIds,
-    );
-    final arrived = progress.visitedPlaceIds.difference(_visitedPlaceIds);
-    _visitedPlaceIds.addAll(progress.visitedPlaceIds);
-
+  void _afterFix(
+    OptimizedRoute current,
+    GeoPoint here, {
+    required bool countDeviation,
+  }) {
+    final arrivedNow = _trackArrival(current, here);
     final remaining = [
       for (final stop in current.stops)
         if (!_visitedPlaceIds.contains(stop.place.placeId)) stop.place,
@@ -296,13 +320,14 @@ class RouteController extends GetxController with WidgetsBindingObserver {
       return;
     }
 
-    if (arrived.isNotEmpty) {
-      final next = progressIndex.value + arrived.length;
-      progressIndex.value = next > progressTotal.value ? progressTotal.value : next;
-      _offRouteSamples = 0;
-      return;
-    }
+    if (arrivedNow || !countDeviation) return;
 
+    final progress = RouteProgressEvaluator.evaluate(
+      position: here,
+      polyline: current.polyline,
+      stops: current.stops,
+      alreadyVisited: _visitedPlaceIds,
+    );
     if (_isBesideVisitedStop(current, here) || !progress.offRoute) {
       _offRouteSamples = 0;
       return;
@@ -311,10 +336,95 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     _offRouteSamples++;
     if (_offRouteSamples < _offRouteSamplesNeeded || isRecalculating.value) return;
     final lastRecalc = _lastRecalcAt;
-    if (lastRecalc != null && DateTime.now().difference(lastRecalc) < _recalcCooldown) {
+    if (lastRecalc != null && _now().difference(lastRecalc) < _recalcCooldown) return;
+    _recalculate(here, remaining, announce: true);
+  }
+
+  bool _trackArrival(OptimizedRoute current, GeoPoint here) {
+    RouteStop? next;
+    for (final stop in current.stops) {
+      if (_visitedPlaceIds.contains(stop.place.placeId)) continue;
+      next = stop;
+      break;
+    }
+    if (next == null) return false;
+
+    final distance = RouteProgressEvaluator.distanceMeters(
+      here,
+      GeoPoint(next.place.latitude, next.place.longitude),
+    );
+    if (distance > RouteProgressEvaluator.arrivalThresholdMeters) return false;
+
+    _visitedPlaceIds.add(next.place.placeId);
+    final nextIndex = progressIndex.value + 1;
+    progressIndex.value = nextIndex > progressTotal.value ? progressTotal.value : nextIndex;
+    _offRouteSamples = 0;
+    return true;
+  }
+
+  GeoPoint _matchedPoint(OptimizedRoute current, GeoPoint here) {
+    if (current.polyline.length < 2) return here;
+    final distance = RouteProgressEvaluator.distanceToPolylineMeters(here, current.polyline);
+    if (distance > RouteProgressEvaluator.deviationThresholdMeters) return here;
+    final slice = RouteProgressEvaluator.trimTraveled(
+      position: here,
+      polyline: current.polyline,
+      fromSegment: _routeSegment,
+    );
+    return slice.points.isEmpty ? here : slice.points.first;
+  }
+
+  void _glideTo(GeoPoint target, double heading) {
+    final headingTo = heading >= 0 && heading <= 360 ? heading : userHeading.value;
+    final from = userPosition.value;
+    final now = _now();
+    if (from == null || _lastGlideAt == null) {
+      userPosition.value = target;
+      userHeading.value = headingTo;
+      _lastGlideAt = now;
+      _slide = null;
       return;
     }
-    _recalculate(here, remaining, announce: true);
+
+    final gap = now.difference(_lastGlideAt!);
+    _lastGlideAt = now;
+    if (gap <= Duration.zero) {
+      userPosition.value = target;
+      userHeading.value = headingTo;
+      _slide = null;
+      return;
+    }
+
+    final millis = gap.inMilliseconds.clamp(_minGlide.inMilliseconds, _maxGlide.inMilliseconds);
+    _slide = _MarkerSlide(
+      from: from,
+      to: target,
+      fromHeading: userHeading.value,
+      toHeading: headingTo,
+      started: now,
+      duration: Duration(milliseconds: millis),
+    );
+  }
+
+  void _publishFrame(GeoPoint point, OptimizedRoute current) {
+    userPosition.value = point;
+    _advanceManeuver(current, point);
+    _trimPolyline(point, current.polyline);
+    markersTick.value++;
+    _follow(point);
+  }
+
+  void _ensureGlideTimer() {
+    if (_glideTimer != null) return;
+    _glideTimer = Timer.periodic(_glideTick, (_) => _onGlideTick());
+  }
+
+  void _resetMotion() {
+    _slide = null;
+    _lastFix = null;
+    _lastGlideAt = null;
+    _glideTimer?.cancel();
+    _glideTimer = null;
   }
 
   bool _isBesideVisitedStop(OptimizedRoute current, GeoPoint here) {
@@ -335,7 +445,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     markersTick.value++;
     notice.value = null;
     _noticeTimer?.cancel();
-    _lastRecalcAt = DateTime.now();
+    _lastRecalcAt = _now();
     _offRouteSamples = 0;
 
     try {
@@ -345,7 +455,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
         originLongitude: here.longitude,
       );
       await _loadMarkerIcons(optimized);
-      _maneuverIndex = 0;
+      activeManeuverIndex.value = 0;
       _resetPolylineProgress();
       route.value = optimized;
       markersTick.value++;
@@ -382,11 +492,13 @@ class RouteController extends GetxController with WidgetsBindingObserver {
   }
 
   void _advanceManeuver(OptimizedRoute current, GeoPoint here) {
-    final maneuvers = current.maneuvers;
-    while (_maneuverIndex < maneuvers.length - 1) {
-      final distance = RouteProgressEvaluator.distanceMeters(here, maneuvers[_maneuverIndex].end);
-      if (distance > _stepArrivalMeters) break;
-      _maneuverIndex++;
+    final next = RouteProgressEvaluator.activeManeuverIndex(
+      position: here,
+      maneuvers: current.maneuvers,
+      currentIndex: activeManeuverIndex.value,
+    );
+    if (next != activeManeuverIndex.value) {
+      activeManeuverIndex.value = next;
     }
   }
 
@@ -420,6 +532,8 @@ class RouteController extends GetxController with WidgetsBindingObserver {
   void _stopPositionStream() {
     _positionSub?.cancel();
     _positionSub = null;
+    _glideTimer?.cancel();
+    _glideTimer = null;
   }
 
   void _resetPolylineProgress() {
@@ -440,13 +554,13 @@ class RouteController extends GetxController with WidgetsBindingObserver {
   Future<void> _follow(GeoPoint here) async {
     final map = _mapController;
     if (map == null) return;
-    final now = DateTime.now();
+    final now = _now();
     final lastMove = _lastCameraMove;
     if (lastMove != null && now.difference(lastMove) < _cameraInterval) return;
     _lastCameraMove = now;
     final target = LatLng(here.latitude, here.longitude);
     try {
-      await map.animateCamera(
+      await map.moveCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: target,
@@ -569,4 +683,22 @@ class RouteController extends GetxController with WidgetsBindingObserver {
       // O mapa nativo pode ter sido recarregado no emulador.
     }
   }
+}
+
+class _MarkerSlide {
+  const _MarkerSlide({
+    required this.from,
+    required this.to,
+    required this.fromHeading,
+    required this.toHeading,
+    required this.started,
+    required this.duration,
+  });
+
+  final GeoPoint from;
+  final GeoPoint to;
+  final double fromHeading;
+  final double toHeading;
+  final DateTime started;
+  final Duration duration;
 }

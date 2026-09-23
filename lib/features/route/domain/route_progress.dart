@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:teste_spixs/features/route/domain/entities/geo_point.dart';
+import 'package:teste_spixs/features/route/domain/entities/route_maneuver.dart';
 import 'package:teste_spixs/features/route/domain/entities/route_stop.dart';
 
 class RouteProgress {
@@ -23,11 +24,35 @@ class PolylineSlice {
 abstract final class RouteProgressEvaluator {
   static const deviationThresholdMeters = 40.0;
   static const arrivalThresholdMeters = 20.0;
+  static const stepArrivalMeters = 35.0;
   static const maxAccuracyMeters = 100.0;
   static const trailSnapMeters = 50.0;
   static const trailLookaheadMeters = 250.0;
 
   static bool acceptsFix(double accuracyMeters) => accuracyMeters <= maxAccuracyMeters;
+
+  static int activeManeuverIndex({
+    required GeoPoint position,
+    required List<RouteManeuver> maneuvers,
+    required int currentIndex,
+  }) {
+    if (maneuvers.isEmpty) return 0;
+    var index = currentIndex.clamp(0, maneuvers.length - 1);
+    while (index < maneuvers.length - 1) {
+      final toCurrent = distanceMeters(position, maneuvers[index].end);
+      if (toCurrent <= stepArrivalMeters) {
+        index++;
+        continue;
+      }
+      final toNext = distanceMeters(position, maneuvers[index + 1].end);
+      if (toNext <= toCurrent) {
+        index++;
+        continue;
+      }
+      break;
+    }
+    return index;
+  }
 
   static RouteProgress evaluate({
     required GeoPoint position,

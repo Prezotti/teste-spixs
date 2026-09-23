@@ -85,7 +85,6 @@ class DirectionsRepositoryImpl implements DirectionsRepository {
     final legDistances = <int>[];
     final legDurations = <int>[];
     final maneuvers = <RouteManeuver>[];
-    var legIndex = 0;
 
     for (final leg in travelLegs) {
       final legDistance = (leg['distanceMeters'] as num?)?.toInt() ?? 0;
@@ -94,8 +93,7 @@ class DirectionsRepositoryImpl implements DirectionsRepository {
       legDurations.add(legDuration);
       distanceMeters += legDistance;
       durationSeconds += legDuration;
-      if (legIndex == 0) maneuvers.addAll(_maneuversOf(leg));
-      legIndex++;
+      maneuvers.addAll(_maneuversOf(leg));
 
       final encoded = leg['polyline']?['encodedPolyline'] as String?;
       if (encoded == null || encoded.isEmpty) continue;

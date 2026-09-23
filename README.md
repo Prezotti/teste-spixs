@@ -126,7 +126,7 @@ O endereço escolhido fica numa lista de até 10 recentes, gravada com Hive. Na 
 
 `computeRoutes` com `optimizeWaypointOrder`. A API só reordena waypoints intermediários, então o destino da requisição é a própria origem. Todas as paradas viram intermediários. A perna de volta até a origem é descartada na hora de somar distância, duração e polyline. A ordem exibida é a de `optimizedIntermediateWaypointIndex`, não a digitada.
 
-O field mask pede duração, distância, polyline, a ordem otimizada e, na primeira perna, `navigationInstruction` para o texto da manobra em português.
+O field mask pede duração, distância, polyline, a ordem otimizada e `navigationInstruction` em cada perna, para o texto da manobra em português.
 
 Uma parada só, com origem GPS, é válida. Isso importa no recálculo, quando resta um único ponto.
 
@@ -136,11 +136,11 @@ O mapa é `google_maps_flutter`. A rota em si não vem do widget: o widget só d
 
 O `GoogleMap` fica fora de `Obx`. Recriar o platform view a cada emissão derruba o mapa no emulador. Marcadores e a polyline atualizam por um `setState` estável quando a rota ou a posição mudam.
 
-Os marcadores são círculos numerados na ordem otimizada, desenhados em bitmap. Na navegação, a seta usa a direção do GPS e a câmera aponta para o mesmo rumo, com a seta mais baixa na tela para mostrar o trecho à frente. O traço atrás da posição some; fica só o caminho que ainda falta. O ponto azul padrão do Maps fica desligado nesse modo, para não duplicar o usuário.
+Os marcadores são círculos numerados na ordem otimizada, desenhados em bitmap. Na navegação, a seta desliza entre as leituras do GPS e gruda na rota enquanto o sinal está perto dela, em vez de pular de um ponto ao outro. A câmera aponta para o mesmo rumo, com a seta mais baixa na tela para mostrar o trecho à frente. O traço atrás da posição some; fica só o caminho que ainda falta. O ponto azul padrão do Maps fica desligado nesse modo, para não duplicar o usuário.
 
 ### Navegação e recálculo
 
-Chegada: até 20 m da parada. Desvio: mais de 40 m da polyline, em duas leituras seguidas, com 20 s de intervalo entre chamadas da API. Leitura com precisão pior que 100 m não conta como chegada nem como desvio.
+Chegada: até 20 m da próxima parada. Desvio: mais de 40 m da polyline, em duas leituras seguidas, com 20 s de intervalo entre chamadas da API. Leitura com precisão pior que 100 m não move o marcador nem conta como desvio.
 
 Enquanto a API responde, o banner mostra "Recalculando…". Sucesso vira "Rota recalculada" por 5 s e a linha fica tracejada em `warning`. Falha da API ou do GPS aparece no mesmo banner. Permissão negada e GPS desligado têm textos diferentes, e os dois são checados antes de abrir o stream.
 

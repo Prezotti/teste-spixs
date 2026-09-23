@@ -179,32 +179,35 @@ class _ManeuverBannerBody extends GetView<RouteController> {
 
   @override
   Widget build(BuildContext context) {
-    final here = controller.userPosition.value;
-    final maneuver = controller.activeManeuver;
-    final instruction = maneuver?.instruction ?? _fallbackInstruction(controller);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          _iconForManeuver(maneuver?.maneuver),
-          color: AppColors.onBrand,
-          size: AppSpacing.space4,
-        ),
-        const SizedBox(width: AppSpacing.space3),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              UIText.display(
-                _formatDistance(controller.distanceToActiveStep(here)),
-                color: AppColors.onBrand,
-              ),
-              UIText.body(instruction, color: AppColors.onBrand, maxLines: 2),
-            ],
+    return Obx(() {
+      final here = controller.userPosition.value;
+      controller.activeManeuverIndex.value;
+      final maneuver = controller.activeManeuver;
+      final instruction = maneuver?.instruction ?? _fallbackInstruction(controller);
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            _iconForManeuver(maneuver?.maneuver),
+            color: AppColors.onBrand,
+            size: AppSpacing.space4,
           ),
-        ),
-      ],
-    );
+          const SizedBox(width: AppSpacing.space3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                UIText.display(
+                  _formatDistance(controller.distanceToActiveStep(here)),
+                  color: AppColors.onBrand,
+                ),
+                UIText.body(instruction, color: AppColors.onBrand, maxLines: 2),
+              ],
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 
