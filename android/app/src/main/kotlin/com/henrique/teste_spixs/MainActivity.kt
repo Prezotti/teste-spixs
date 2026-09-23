@@ -1,4 +1,4 @@
-package com.spixs.teste_spixs
+package com.henrique.teste_spixs
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

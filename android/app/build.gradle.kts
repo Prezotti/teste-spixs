@@ -31,7 +31,7 @@ val googleMapsApiKey =
     loadDotEnv(rootProject.file("../.env"))["GOOGLE_MAPS_API_KEY"] ?: ""
 
 android {
-    namespace = "com.spixs.teste_spixs"
+    namespace = "com.henrique.teste_spixs"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -42,7 +42,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.spixs.teste_spixs"
+        applicationId = "com.henrique.teste_spixs"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
