@@ -136,7 +136,7 @@ O mapa é `google_maps_flutter`. A rota em si não vem do widget: o widget só d
 
 O `GoogleMap` fica fora de `Obx`. Recriar o platform view a cada emissão derruba o mapa no emulador. Marcadores e a polyline atualizam por um `setState` estável quando a rota ou a posição mudam.
 
-Os marcadores são círculos numerados na ordem otimizada, desenhados em bitmap. Na navegação, a seta usa a direção do GPS e a câmera aponta para o mesmo rumo. O ponto azul padrão do Maps fica desligado nesse modo, para não duplicar o usuário.
+Os marcadores são círculos numerados na ordem otimizada, desenhados em bitmap. Na navegação, a seta usa a direção do GPS e a câmera aponta para o mesmo rumo, com a seta mais baixa na tela para mostrar o trecho à frente. O traço atrás da posição some; fica só o caminho que ainda falta. O ponto azul padrão do Maps fica desligado nesse modo, para não duplicar o usuário.
 
 ### Navegação e recálculo
 

@@ -66,6 +66,8 @@ class RouteController extends GetxController with WidgetsBindingObserver {
   BitmapDescriptor? _arrowIcon;
   var _offRouteSamples = 0;
   var _maneuverIndex = 0;
+  var _routeSegment = 0;
+  List<GeoPoint> _visiblePolyline = const [];
   DateTime? _lastRecalcAt;
 
   void toggleOrder() => isOrderExpanded.toggle();
@@ -140,10 +142,13 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     if (current == null) return const {};
 
     final updating = showRecalcBanner.value || isRecalculating.value;
+    final source = isNavigating.value && _visiblePolyline.length >= 2
+        ? _visiblePolyline
+        : current.polyline;
     return {
       Polyline(
         polylineId: const PolylineId('optimized-route'),
-        points: [for (final point in current.polyline) LatLng(point.latitude, point.longitude)],
+        points: [for (final point in source) LatLng(point.latitude, point.longitude)],
         color: updating ? AppColors.warning : AppColors.brand,
         width: AppSpacing.space1.toInt(),
         patterns: updating
@@ -199,6 +204,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     progressIndex.value = 1;
     _maneuverIndex = 0;
     _offRouteSamples = 0;
+    _resetPolylineProgress();
     showRecalcBanner.value = false;
     try {
       _arrowIcon ??= await _arrowIconLoader();
@@ -234,6 +240,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
       notice.value = null;
       _noticeTimer?.cancel();
     }
+    _resetPolylineProgress();
     markersTick.value++;
     _faceNorth(here);
   }
@@ -253,6 +260,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
 
     final here = GeoPoint(position.latitude, position.longitude);
     userPosition.value = here;
+    _trimPolyline(here, current.polyline);
     if (position.heading >= 0 && position.heading <= 360) {
       userHeading.value = position.heading;
     }
@@ -338,6 +346,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
       );
       await _loadMarkerIcons(optimized);
       _maneuverIndex = 0;
+      _resetPolylineProgress();
       route.value = optimized;
       markersTick.value++;
       if (announce) _showRecalcBanner();
@@ -413,6 +422,21 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     _positionSub = null;
   }
 
+  void _resetPolylineProgress() {
+    _routeSegment = 0;
+    _visiblePolyline = const [];
+  }
+
+  void _trimPolyline(GeoPoint here, List<GeoPoint> polyline) {
+    final slice = RouteProgressEvaluator.trimTraveled(
+      position: here,
+      polyline: polyline,
+      fromSegment: _routeSegment,
+    );
+    _routeSegment = slice.segmentIndex;
+    _visiblePolyline = slice.points;
+  }
+
   Future<void> _follow(GeoPoint here) async {
     final map = _mapController;
     if (map == null) return;
@@ -464,6 +488,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
         originLongitude: args.originLongitude,
       );
       await _loadMarkerIcons(optimized);
+      _resetPolylineProgress();
       route.value = optimized;
       await _fitCamera();
     } on AppException catch (error) {

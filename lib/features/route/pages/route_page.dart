@@ -52,6 +52,8 @@ class _StableMap extends StatefulWidget {
 }
 
 class _StableMapState extends State<_StableMap> {
+  static const _aheadPaddingFraction = 0.4;
+
   Worker? _routeWorker;
   Worker? _iconWorker;
 
@@ -77,11 +79,15 @@ class _StableMapState extends State<_StableMap> {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<RouteController>();
+    final navigating = controller.isNavigating.value;
     return GoogleMap(
       initialCameraPosition: controller.initialCamera,
       markers: controller.markers,
       polylines: controller.polylines,
-      myLocationEnabled: !controller.isNavigating.value,
+      padding: navigating
+          ? EdgeInsets.only(top: MediaQuery.sizeOf(context).height * _aheadPaddingFraction)
+          : EdgeInsets.zero,
+      myLocationEnabled: !navigating,
       myLocationButtonEnabled: false,
       zoomControlsEnabled: false,
       compassEnabled: false,

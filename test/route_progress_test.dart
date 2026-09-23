@@ -60,6 +60,42 @@ void main() {
     );
   });
 
+  test('drops the traveled stretch and keeps the road ahead', () {
+    const line = [
+      GeoPoint(0, 0),
+      GeoPoint(0, 0.001),
+      GeoPoint(0, 0.002),
+    ];
+
+    final ahead = RouteProgressEvaluator.trimTraveled(
+      position: const GeoPoint(0, 0.0015),
+      polyline: line,
+      fromSegment: 0,
+    );
+
+    expect(ahead.segmentIndex, 1);
+    expect(ahead.points.first.longitude, closeTo(0.0015, 0.00005));
+    expect(ahead.points.every((point) => point.longitude >= 0.0014), isTrue);
+    expect(ahead.points.last.longitude, 0.002);
+  });
+
+  test('does not restore the route already passed', () {
+    const line = [
+      GeoPoint(0, 0),
+      GeoPoint(0, 0.001),
+      GeoPoint(0, 0.002),
+    ];
+
+    final stayed = RouteProgressEvaluator.trimTraveled(
+      position: const GeoPoint(0, 0.0002),
+      polyline: line,
+      fromSegment: 1,
+    );
+
+    expect(stayed.segmentIndex, 1);
+    expect(stayed.points.every((point) => point.longitude >= 0.001), isTrue);
+  });
+
   test('rejects a GPS fix less accurate than 100 meters', () {
     expect(RouteProgressEvaluator.acceptsFix(100), isTrue);
     expect(RouteProgressEvaluator.acceptsFix(101), isFalse);

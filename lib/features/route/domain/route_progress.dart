@@ -13,10 +13,19 @@ class RouteProgress {
   final bool offRoute;
 }
 
+class PolylineSlice {
+  const PolylineSlice({required this.points, required this.segmentIndex});
+
+  final List<GeoPoint> points;
+  final int segmentIndex;
+}
+
 abstract final class RouteProgressEvaluator {
   static const deviationThresholdMeters = 40.0;
   static const arrivalThresholdMeters = 20.0;
   static const maxAccuracyMeters = 100.0;
+  static const trailSnapMeters = 50.0;
+  static const trailLookaheadMeters = 250.0;
 
   static bool acceptsFix(double accuracyMeters) => accuracyMeters <= maxAccuracyMeters;
 
@@ -63,13 +72,51 @@ abstract final class RouteProgressEvaluator {
 
     var nearest = double.infinity;
     for (var i = 0; i < polyline.length - 1; i++) {
-      final distance = _distanceToSegmentMeters(point, polyline[i], polyline[i + 1]);
+      final distance = _closestOnSegment(point, polyline[i], polyline[i + 1]).distance;
       if (distance < nearest) nearest = distance;
     }
     return nearest;
   }
 
-  static double _distanceToSegmentMeters(GeoPoint point, GeoPoint start, GeoPoint end) {
+  static PolylineSlice trimTraveled({
+    required GeoPoint position,
+    required List<GeoPoint> polyline,
+    required int fromSegment,
+  }) {
+    if (polyline.length < 2) {
+      return PolylineSlice(points: polyline, segmentIndex: 0);
+    }
+
+    final start = fromSegment.clamp(0, polyline.length - 2);
+    var bestIndex = start;
+    var bestDistance = double.infinity;
+    var bestPoint = polyline[start];
+    var along = 0.0;
+
+    for (var i = start; i < polyline.length - 1; i++) {
+      final hit = _closestOnSegment(position, polyline[i], polyline[i + 1]);
+      if (hit.distance < bestDistance) {
+        bestDistance = hit.distance;
+        bestIndex = i;
+        bestPoint = hit.point;
+      }
+      along += distanceMeters(polyline[i], polyline[i + 1]);
+      if (along >= trailLookaheadMeters) break;
+    }
+
+    final onTrail = bestDistance <= trailSnapMeters;
+    final segmentIndex = onTrail ? bestIndex : start;
+    final anchor = onTrail
+        ? bestPoint
+        : _closestOnSegment(position, polyline[start], polyline[start + 1]).point;
+
+    return PolylineSlice(
+      points: [anchor, ...polyline.sublist(segmentIndex + 1)],
+      segmentIndex: segmentIndex,
+    );
+  }
+
+  static _SegmentHit _closestOnSegment(GeoPoint point, GeoPoint start, GeoPoint end) {
     final lngScale = 111320.0 * math.cos(_rad(point.latitude));
     const latScale = 111320.0;
 
@@ -82,7 +129,10 @@ abstract final class RouteProgressEvaluator {
     final deltaNorth = north(end) - startNorth;
     final lengthSquared = deltaEast * deltaEast + deltaNorth * deltaNorth;
     if (lengthSquared == 0) {
-      return math.sqrt(startEast * startEast + startNorth * startNorth);
+      return _SegmentHit(
+        distance: math.sqrt(startEast * startEast + startNorth * startNorth),
+        point: start,
+      );
     }
 
     final projection =
@@ -90,8 +140,21 @@ abstract final class RouteProgressEvaluator {
     final clamped = projection.clamp(0.0, 1.0);
     final closestEast = startEast + deltaEast * clamped;
     final closestNorth = startNorth + deltaNorth * clamped;
-    return math.sqrt(closestEast * closestEast + closestNorth * closestNorth);
+    return _SegmentHit(
+      distance: math.sqrt(closestEast * closestEast + closestNorth * closestNorth),
+      point: GeoPoint(
+        start.latitude + (end.latitude - start.latitude) * clamped,
+        start.longitude + (end.longitude - start.longitude) * clamped,
+      ),
+    );
   }
 
   static double _rad(double degrees) => degrees * math.pi / 180;
+}
+
+class _SegmentHit {
+  const _SegmentHit({required this.distance, required this.point});
+
+  final double distance;
+  final GeoPoint point;
 }
