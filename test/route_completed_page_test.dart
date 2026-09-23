@@ -15,19 +15,21 @@ void main() {
 
     await tester.pumpWidget(
       GetMaterialApp(
-        initialRoute: AppRoutes.routeCompleted,
+        initialRoute: AppRoutes.home,
         getPages: [
-          GetPage(
-            name: AppRoutes.routeCompleted,
-            page: () => const RouteCompletedPage(summary: summary),
-          ),
           GetPage(
             name: AppRoutes.home,
             page: () => const Scaffold(body: Text('home')),
           ),
+          GetPage(
+            name: AppRoutes.routeCompleted,
+            page: () => const RouteCompletedPage(summary: summary),
+          ),
         ],
       ),
     );
+    Get.toNamed(AppRoutes.routeCompleted);
+    await tester.pumpAndSettle();
 
     expect(find.text('Rota concluída!'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);

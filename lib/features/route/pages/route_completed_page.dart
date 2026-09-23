@@ -69,7 +69,7 @@ class RouteCompletedPage extends StatelessWidget {
               const Spacer(),
               UIPrimaryButton(
                 label: 'Concluir',
-                onPressed: () => Get.offAllNamed(AppRoutes.home),
+                onPressed: () => Get.until((route) => route.settings.name == AppRoutes.home),
               ),
             ],
           ),
