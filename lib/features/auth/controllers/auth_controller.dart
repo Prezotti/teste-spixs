@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:teste_spixs/core/location/location_permission_service.dart';
 import 'package:teste_spixs/core/routes/app_routes.dart';
-import 'package:teste_spixs/features/auth/widgets/auth_retry_dialog.dart';
 
 class AuthController extends GetxController {
   AuthController({
@@ -28,8 +27,6 @@ class AuthController extends GetxController {
 
     if (_isNativeAuthUnsupported) return;
 
-    var failed = false;
-
     try {
       if (!await _localAuth.isDeviceSupported()) {
         _goHome();
@@ -46,36 +43,15 @@ class AuthController extends GetxController {
         persistAcrossBackgrounding: true,
       );
 
-      if (ok) {
-        _goHome();
-        return;
-      }
-
-      failed = true;
+      if (ok) _goHome();
     } on LocalAuthException catch (exception) {
       if (exception.code == LocalAuthExceptionCode.noCredentialsSet) {
         _goHome();
-        return;
       }
-      if (exception.code == LocalAuthExceptionCode.noBiometricsEnrolled) return;
-      failed = true;
     } on PlatformException catch (exception) {
       if (_isBiometricUnavailable(exception)) return;
-      failed = true;
     } finally {
       isLoading.value = false;
-    }
-
-    if (!failed) return;
-
-    final retry = await Get.dialog<bool>(
-          const AuthRetryDialog(),
-          barrierDismissible: false,
-        ) ??
-        false;
-
-    if (retry) {
-      await authenticateWithBiometrics();
     }
   }
 
