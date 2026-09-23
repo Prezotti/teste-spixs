@@ -7,7 +7,7 @@ App Flutter de roteirização de entregas. O usuário destrava o aparelho, infor
 1. **Bloqueio.** Face ID ou digital. Se não houver biometria, ou se a tentativa falhar ou for cancelada, dá para entrar com a senha ou o PIN do celular. Sem biometria e sem PIN, a tela de bloqueio não aparece.
 2. **Localização.** O app pede permissão antes da home. "Agora não" segue sem GPS; a busca de endereço continua, só que sem viés de proximidade.
 3. **Endereços.** Três campos obrigatórios e "Adicionar ponto" sem limite fixo. Tocar num campo abre a busca em tela cheia, com os endereços recentes até começar a digitar. Cada ponto extra pode ser removido. Só vale um endereço escolhido na lista, não texto livre.
-4. **Rota otimizada.** O ponto 1 é sempre a localização atual. A Routes API reordena os endereços digitados a partir do ponto 2.
+4. **Rota otimizada.** A rota começa na localização atual, sem número. A Routes API reordena as entregas e os marcadores começam em 1.
 5. **Navegação.** "Iniciar" abre o modo de curva a curva: banner da manobra, próximo destino, progresso "1 de N" e seta acompanhando o GPS.
 6. **Recálculo.** Desvio confirmado gera uma rota nova só com as paradas que faltam. O banner laranja avisa o que aconteceu.
 
@@ -140,7 +140,7 @@ Os marcadores são círculos numerados na ordem otimizada, desenhados em bitmap.
 
 ### Navegação e recálculo
 
-Chegada: até 45 m da parada. Desvio: mais de 40 m da polyline, em duas leituras seguidas, com 20 s de intervalo entre chamadas da API. Leitura com precisão pior que 100 m não conta como chegada nem como desvio.
+Chegada: até 20 m da parada. Desvio: mais de 40 m da polyline, em duas leituras seguidas, com 20 s de intervalo entre chamadas da API. Leitura com precisão pior que 100 m não conta como chegada nem como desvio.
 
 Enquanto a API responde, o banner mostra "Recalculando…". Sucesso vira "Rota recalculada" por 5 s e a linha fica tracejada em `warning`. Falha da API ou do GPS aparece no mesmo banner. Permissão negada e GPS desligado têm textos diferentes, e os dois são checados antes de abrir o stream.
 

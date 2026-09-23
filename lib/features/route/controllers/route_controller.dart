@@ -9,7 +9,9 @@ import 'package:teste_spixs/core/errors/app_exception.dart';
 import 'package:teste_spixs/core/location/location_permission_service.dart';
 import 'package:teste_spixs/features/home/domain/entities/place_details.dart';
 import 'package:teste_spixs/features/route/data/numbered_marker_icon.dart';
+import 'package:teste_spixs/core/routes/app_routes.dart';
 import 'package:teste_spixs/features/route/domain/entities/geo_point.dart';
+import 'package:teste_spixs/features/route/domain/entities/route_completion.dart';
 import 'package:teste_spixs/features/route/domain/entities/optimized_route.dart';
 import 'package:teste_spixs/features/route/domain/entities/route_maneuver.dart';
 import 'package:teste_spixs/features/route/domain/repositories/directions_repository.dart';
@@ -60,6 +62,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
   DateTime? _lastCameraMove;
   Timer? _noticeTimer;
   Timer? _recalcBannerTimer;
+  RouteCompletion? _completion;
   BitmapDescriptor? _arrowIcon;
   var _offRouteSamples = 0;
   var _maneuverIndex = 0;
@@ -73,7 +76,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     final origin = args.hasOrigin
         ? LatLng(args.originLatitude!, args.originLongitude!)
         : LatLng(args.stops.first.latitude, args.stops.first.longitude);
-    return CameraPosition(target: origin, zoom: 13);
+    return CameraPosition(target: origin, zoom: 16);
   }
 
   Set<Marker> get markers {
@@ -81,15 +84,6 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     if (current == null) return const {};
 
     final markers = <Marker>{
-      if (current.origin != null && _markerIcons[1] != null)
-        Marker(
-          markerId: const MarkerId('origin'),
-          position: LatLng(current.origin!.latitude, current.origin!.longitude),
-          infoWindow: const InfoWindow(title: '1', snippet: 'Sua localização'),
-          icon: _markerIcons[1]!,
-          anchor: const Offset(0.5, 0.5),
-          zIndexInt: 1,
-        ),
       for (final stop in current.stops)
         if (_markerIcons[stop.number] != null)
           Marker(
@@ -195,7 +189,13 @@ class RouteController extends GetxController with WidgetsBindingObserver {
       return;
     }
 
-    progressTotal.value = route.value!.stops.length;
+    final planned = route.value!;
+    _completion = RouteCompletion(
+      deliveries: planned.stops.length,
+      durationSeconds: planned.durationSeconds,
+      distanceMeters: planned.distanceMeters,
+    );
+    progressTotal.value = planned.stops.length;
     progressIndex.value = 1;
     _maneuverIndex = 0;
     _offRouteSamples = 0;
@@ -275,19 +275,27 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     ];
 
     if (remaining.isEmpty) {
+      final summary = _completion ??
+          RouteCompletion(
+            deliveries: current.stops.length,
+            durationSeconds: current.durationSeconds,
+            distanceMeters: current.distanceMeters,
+          );
       stopNavigation();
-      _showNotice('Você concluiu as paradas.');
+      if (Get.key.currentState != null) {
+        Get.offNamed(AppRoutes.routeCompleted, arguments: summary);
+      }
       return;
     }
 
     if (arrived.isNotEmpty) {
       final next = progressIndex.value + arrived.length;
       progressIndex.value = next > progressTotal.value ? progressTotal.value : next;
-      _recalculate(here, remaining, announce: false);
+      _offRouteSamples = 0;
       return;
     }
 
-    if (!progress.offRoute) {
+    if (_isBesideVisitedStop(current, here) || !progress.offRoute) {
       _offRouteSamples = 0;
       return;
     }
@@ -299,6 +307,18 @@ class RouteController extends GetxController with WidgetsBindingObserver {
       return;
     }
     _recalculate(here, remaining, announce: true);
+  }
+
+  bool _isBesideVisitedStop(OptimizedRoute current, GeoPoint here) {
+    for (final stop in current.stops) {
+      if (!_visitedPlaceIds.contains(stop.place.placeId)) continue;
+      final distance = RouteProgressEvaluator.distanceMeters(
+        here,
+        GeoPoint(stop.place.latitude, stop.place.longitude),
+      );
+      if (distance <= RouteProgressEvaluator.arrivalThresholdMeters) return true;
+    }
+    return false;
   }
 
   Future<void> _recalculate(GeoPoint here, List<PlaceDetails> remaining, {required bool announce}) async {
@@ -406,7 +426,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: target,
-            zoom: 17,
+            zoom: 19,
             bearing: userHeading.value,
           ),
         ),
@@ -424,7 +444,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: LatLng(here.latitude, here.longitude),
-            zoom: 15,
+            zoom: 18,
           ),
         ),
       );
@@ -459,9 +479,6 @@ class RouteController extends GetxController with WidgetsBindingObserver {
 
   Future<void> _loadMarkerIcons(OptimizedRoute optimized) async {
     final icons = <int, BitmapDescriptor>{};
-    if (optimized.origin != null) {
-      icons[1] = _markerIcons[1] ?? await _numberedIcon(1);
-    }
     for (final stop in optimized.stops) {
       icons[stop.number] = _markerIcons[stop.number] ?? await _numberedIcon(stop.number);
     }
@@ -481,7 +498,7 @@ class RouteController extends GetxController with WidgetsBindingObserver {
     if (latitude == null || longitude == null) return;
 
     try {
-      await map.animateCamera(CameraUpdate.newLatLngZoom(LatLng(latitude, longitude), 16));
+      await map.animateCamera(CameraUpdate.newLatLngZoom(LatLng(latitude, longitude), 18));
     } catch (_) {
       // O mapa nativo pode ter sido recarregado no emulador.
     }
@@ -516,6 +533,13 @@ class RouteController extends GetxController with WidgetsBindingObserver {
           AppSpacing.space4,
         ),
       );
+      final zoom = await map.getZoomLevel();
+      if (zoom < 16) {
+        final focus = current.origin ?? current.polyline.first;
+        await map.animateCamera(
+          CameraUpdate.newLatLngZoom(LatLng(focus.latitude, focus.longitude), 16),
+        );
+      }
     } catch (_) {
       // O mapa nativo pode ter sido recarregado no emulador.
     }

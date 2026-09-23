@@ -33,7 +33,7 @@ void main() {
 
   test('marks a stop visited when the user is close to it', () {
     final progress = RouteProgressEvaluator.evaluate(
-      position: const GeoPoint(0.0002, 0),
+      position: const GeoPoint(0.00012, 0),
       polyline: line,
       stops: const [stop],
       alreadyVisited: const {},

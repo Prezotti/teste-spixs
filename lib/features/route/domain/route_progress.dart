@@ -15,7 +15,7 @@ class RouteProgress {
 
 abstract final class RouteProgressEvaluator {
   static const deviationThresholdMeters = 40.0;
-  static const arrivalThresholdMeters = 45.0;
+  static const arrivalThresholdMeters = 20.0;
   static const maxAccuracyMeters = 100.0;
 
   static bool acceptsFix(double accuracyMeters) => accuracyMeters <= maxAccuracyMeters;

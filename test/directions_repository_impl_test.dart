@@ -91,7 +91,7 @@ void main() {
     );
 
     expect(route.stops.map((stop) => stop.place.placeId), ['b', 'a']);
-    expect(route.stops.map((stop) => stop.number), [2, 3]);
+    expect(route.stops.map((stop) => stop.number), [1, 2]);
     expect(route.origin, isNotNull);
     expect(route.distanceMeters, 3000);
     expect(route.durationSeconds, 360);

@@ -345,7 +345,9 @@ class _NavDestinationCard extends GetView<RouteController> {
     return Obx(() {
       final current = controller.route.value;
       if (current == null || current.stops.isEmpty) return const SizedBox.shrink();
-      final next = current.stops.first;
+      final upcoming = controller.progressIndex.value - 1;
+      if (upcoming < 0 || upcoming >= current.stops.length) return const SizedBox.shrink();
+      final next = current.stops[upcoming];
       final index = controller.progressIndex.value;
       final total = controller.progressTotal.value;
       final fraction = total == 0 ? 0.0 : (index / total).clamp(0.0, 1.0);
@@ -545,10 +547,6 @@ class _OrderCollapse extends GetView<RouteController> {
                         ),
                         child: Column(
                           children: [
-                            if (route.origin != null) ...[
-                              const _OrderRow(number: 1, title: 'Sua localização'),
-                              if (route.stops.isNotEmpty) const SizedBox(height: AppSpacing.space2),
-                            ],
                             for (var i = 0; i < route.stops.length; i++) ...[
                               if (i > 0) const SizedBox(height: AppSpacing.space2),
                               _OrderRow(

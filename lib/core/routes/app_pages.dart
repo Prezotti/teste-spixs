@@ -7,6 +7,8 @@ import 'package:teste_spixs/features/home/pages/home_page.dart';
 import 'package:teste_spixs/features/location/bindings/location_bindings.dart';
 import 'package:teste_spixs/features/location/pages/location_permission_page.dart';
 import 'package:teste_spixs/features/route/bindings/route_bindings.dart';
+import 'package:teste_spixs/features/route/domain/entities/route_completion.dart';
+import 'package:teste_spixs/features/route/pages/route_completed_page.dart';
 import 'package:teste_spixs/features/route/pages/route_page.dart';
 
 abstract final class AppPages {
@@ -30,6 +32,18 @@ abstract final class AppPages {
       name: AppRoutes.route,
       page: () => const RoutePage(),
       binding: RouteBindings(),
+    ),
+    GetPage(
+      name: AppRoutes.routeCompleted,
+      page: () {
+        final summary = Get.arguments;
+        if (summary is! RouteCompletion) {
+          return const RouteCompletedPage(
+            summary: RouteCompletion(deliveries: 0, durationSeconds: 0, distanceMeters: 0),
+          );
+        }
+        return RouteCompletedPage(summary: summary);
+      },
     ),
   ];
 }

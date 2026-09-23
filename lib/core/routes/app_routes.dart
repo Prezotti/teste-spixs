@@ -3,4 +3,5 @@ abstract final class AppRoutes {
   static const locationPermission = '/location-permission';
   static const home = '/home';
   static const route = '/route';
+  static const routeCompleted = '/route-completed';
 }

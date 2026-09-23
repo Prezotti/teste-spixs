@@ -152,6 +152,33 @@ void main() {
     expect(controller.isNavigating.value, isTrue);
   });
 
+  testWidgets('keeps the drawn route when arriving at a stop', (tester) async {
+    await controller.startNavigation();
+    final atStop = fix(latitude: 0.00012, longitude: 0, accuracy: 8);
+    location.positions.add(atStop);
+    location.positions.add(atStop);
+    await tester.pump();
+    await tester.pump();
+
+    expect(directions.calls, 0);
+    expect(controller.isRecalculating.value, isFalse);
+    expect(controller.showRecalcBanner.value, isFalse);
+    expect(controller.progressIndex.value, 2);
+    expect(controller.isNavigating.value, isTrue);
+  });
+
+  testWidgets('finishes the route without asking for another path', (tester) async {
+    await controller.startNavigation();
+    location.positions.add(fix(latitude: 0, longitude: 0, accuracy: 8));
+    await tester.pump();
+    location.positions.add(fix(latitude: 0, longitude: 0.01, accuracy: 8));
+    await tester.pump();
+
+    expect(directions.calls, 0);
+    expect(controller.isNavigating.value, isFalse);
+    expect(controller.notice.value, isNull);
+  });
+
   testWidgets('recalculates after two off-route fixes and announces it', (tester) async {
     await controller.startNavigation();
     final offRoute = fix(latitude: 0.002, longitude: 0.005, accuracy: 8);
